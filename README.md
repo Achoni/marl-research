@@ -10,9 +10,6 @@ Best checkpoint: `runs/mpc_s0/best.pt`. Every number here was measured on this c
 > *If pure pursuit generates the reference and the MPC tracks it, and both use the same
 > bicycle model, aren't they the same? Is the MPC only there for collision avoidance?*
 
-Reasonable, and it was my working assumption too. It is wrong, and the measurement says so.
-Over 200 random states, comparing the MPC's command against the pure-pursuit reference
-control it is tracking:
 
 | situation | mean \|Δ accel\| | mean \|Δ steer rate\| |
 |---|---|---|
@@ -31,17 +28,7 @@ the same turn over several steps instead of slamming the rack. It also weighs po
 8, speed 3, heading 0.5 and steering 0.1 against each other, trading a little of one for less
 of another. Pure pursuit has no notion of that trade.
 
-So the MPC does **two** things, not one:
 
-1. **Smooths and optimises the tracking** — worth 0.40 m/s² of difference in free space.
-2. **Enforces separation** — worth 1.71 m/s² when a car is in the way.
-
-The second is the larger effect, so "mostly collision avoidance" is a fair summary. But
-"identical apart from avoidance" is measurably false.
-
-**And there is a third thing, which the experiments show is the most important of all:
-training *with* the MPC in the loop produces a better policy than bolting it on afterwards.**
-Section 4 has the evidence.
 
 ---
 
