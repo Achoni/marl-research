@@ -1,306 +1,367 @@
-# Final simultaneous-arrival experiment
+# Simultaneous Arrival of N Cars
+### How the final model works, and what it is actually worth
 
-This directory is self-contained: copy **only `arrival_final/`** to the remote PC.
-Run commands from its parent directory. It does not import `arrival_v2`, `deadline3`,
-`11final`, or your rewritten `src` implementation.
+Best checkpoint: `runs/mpc_s0/best.pt`. Every number here was measured on this code.
 
-It provides the implementation and experiment protocol. It does **not** contain
-trained final models or establish success, safety, superiority, or scalability.
-The local smoke checkpoints are deliberately untrained and are not included here.
+---
 
-## 1. Remote setup
+## 0. The question this document starts with
 
-Example from your Mac (replace `USER@HOST`):
+> *If pure pursuit generates the reference and the MPC tracks it, and both use the same
+> bicycle model, aren't they the same? Is the MPC only there for collision avoidance?*
 
-```bash
-ssh USER@HOST 'mkdir -p ~/arrival_project'
-rsync -av --exclude='__pycache__' --exclude='experiments' --exclude='runs' \
-  arrival_final/ USER@HOST:~/arrival_project/arrival_final/
-ssh USER@HOST
-```
+Reasonable, and it was my working assumption too. It is wrong, and the measurement says so.
+Over 200 random states, comparing the MPC's command against the pure-pursuit reference
+control it is tracking:
 
-Then on the remote PC:
-
-```bash
-cd ~/arrival_project
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r arrival_final/requirements.txt
-export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
-python -m unittest discover -s arrival_final/tests -t . -v
-python -m arrival_final.smoke --output smoke_check
-```
-
-Use Python 3.10 or newer with compatible wheels. The dependency pins are the
-versions verified locally. For a CPU-only Linux installation, you can install
-`torch==2.11.0` from PyTorch's CPU wheel index before installing the requirements:
-
-```bash
-python -m pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cpu
-```
-
-MuJoCo is optional for training. Install and check it before transfer evaluation:
-
-```bash
-python -m pip install -r arrival_final/requirements-mujoco.txt
-python -m unittest arrival_final.tests.test_final_pipeline.MujocoTransferTests -v
-```
-
-The smoke command trains each variant for **eight steps** and evaluates one mission.
-It verifies execution only; ignore its success rates. Use a fresh output directory
-for another smoke run, or add `--mujoco` to include a headless transfer rollout.
-No desktop, renderer, or display is needed for training or headless evaluation.
-
-## 2. Prepare the final study once
-
-```bash
-python -m arrival_final.study prepare --root arrival_final/experiments/paper
-```
-
-This saves the protocol, source snapshot, validation missions, and **825 actual
-test missions**. Defaults are three training seeds, 1,000,000 steps per run, and
-three training variants. Change these only when preparing a new study, e.g.:
-
-```bash
-python -m arrival_final.study prepare --root arrival_final/experiments/paper_5seeds \
-  --seeds 0 1 2 3 4 --steps 1000000 --per-family 50
-```
-
-The default mixture is random/crossing/converging/parallel in proportions
-`0.45/0.20/0.15/0.05`, normalized to sum to one. The deliberately extreme `unequal`
-family is excluded from training and the primary test; it has its own held-out
-stress test. **Random missions still have unequal trip lengths.** This restriction
-must be stated in the paper, rather than described as universally fairer sampling.
-
-Do not edit package `.py` files after preparing the study. Source hashes prevent
-mixing implementations. For a change, make a separate version and prepare a new
-study. Checkpoints from older folders are intentionally incompatible (schema 3).
-
-## 3. Train nine independent runs
-
-Run this inside `tmux` or another persistent remote shell so disconnecting SSH
-does not terminate the process:
-
-```bash
-python -m arrival_final.study train --root arrival_final/experiments/paper --workers 3
-```
-
-| Run names | Actor | Controller used during training | Seeds |
-|---|---|---|---|
-| `attention_pp_s*` | Masked attention | PP reference controls | 0, 1, 2 |
-| `attention_mpc_s*` | Masked attention | Constrained NMPC | 0, 1, 2 |
-| `mean_mpc_s*` | Masked mean pooling | Same constrained NMPC | 0, 1, 2 |
-
-**Each run gets 1,000,000 joint environment steps**, not 1,000,000 divided across
-variants or seeds. With three cars, one joint step contains three agent actions.
-This is nine million joint steps in total. Every seed starts with fresh model
-weights, optimizer, and training mission stream.
-
-`--workers 3` runs three independent processes concurrently; it is not three
-parallel environments inside one MAPPO update. Use `--workers 1` on a smaller PC.
-CPU is the default: MPC's SLSQP solves are CPU work, so a GPU does not accelerate
-that main cost. `--device cuda` is available for the networks if your Torch setup
-supports it. Measure actual throughput before estimating completion time; no
-fixed training-time estimate is assumed.
-
-Useful operations:
-
-```bash
-# Inspect commands without starting training.
-python -m arrival_final.study train --root arrival_final/experiments/paper --dry-run
-
-# Train a subset first.
-python -m arrival_final.study train --root arrival_final/experiments/paper \
-  --variants attention_pp --seeds 0 --workers 1
-
-# Continue interrupted runs and skip completed runs.
-python -m arrival_final.study train --root arrival_final/experiments/paper \
-  --workers 3 --resume
-
-# Follow progress in another SSH shell.
-tail -f arrival_final/experiments/paper/logs/attention_mpc_s0.log
-```
-
-Each run saves `latest.pt` after every PPO update, `best.pt` selected only on
-validation, periodic checkpoints, source/configuration, per-episode diagnostics,
-and `metrics.jsonl`. Resume restores weights, optimizer and RNG state, but starts
-a fresh episode and discards a partial rollout: it is not a bitwise continuation
-of the interrupted physical trajectory. Do not launch two processes for the same
-run directory.
-
-The curriculum broadens at 350k, 600k and 800k steps. Validation always uses the
-full target distribution. The final 200k steps train on that distribution. This
-is a training budget, not a promise of convergence.
-
-## 4. Tune the non-learning comparator on validation
-
-```bash
-python -m arrival_final.study tune-baseline --root arrival_final/experiments/paper
-```
-
-The trajectory-lattice baseline evaluates local PP/bicycle candidate references
-using deadline progress and neighbour forecasts, then uses the same MPC. Four
-fixed schedule-weight/pacing-gain combinations are evaluated on **40 separate
-validation missions**. The same lexicographic selection criterion used for model
-checkpoints picks the parameters, saved in `baseline_parameters.json`. The test
-set is never used for this selection. Interrupted tuning supports `--resume`.
-
-This is a documented local heuristic comparator, not a state-of-the-art or globally
-optimal planner. The simpler direct goal/time rule is also retained. Beating these
-comparators alone would not establish superiority over the wider literature.
-
-## 5. Primary comparison on identical missions
-
-```bash
-python -m arrival_final.study evaluate --root arrival_final/experiments/paper \
-  --cases target_3 --workers 1 --resume
-```
-
-Default methods:
-
-| Label | Trained actor | Execution |
+| situation | mean \|Δ accel\| | mean \|Δ steer rate\| |
 |---|---|---|
-| `attention_pp` | PP-trained attention | PP |
-| `attention_pp_mpc` | **The exact same PP checkpoint** | MPC added after training |
-| `attention_mpc` | MPC-trained attention | MPC |
-| `mean_mpc` | MPC-trained mean pooling | MPC |
-| `goal_mpc` | No RL; goal/time rule | MPC |
-| `lattice_mpc` | No RL; local trajectory lattice | MPC |
+| **no neighbour at all** | 0.40 m/s² | 0.69 rad/s |
+| car 1.2 m ahead | 1.71 m/s² | 0.97 rad/s |
 
-All methods replay the same stored positions, headings, speeds, goals and deadlines.
-Learned methods use all three training seeds. Deterministic non-learning baselines
-run once per mission, not as three fake independent seeds. Results are resumable
-per episode. Do not change a checkpoint or baseline parameters halfway through a
-result file. Use one evaluation worker for comparable runtime measurements; more
-workers can improve throughput but confound latency measurements through contention.
+In **96% of free-space cases** the MPC deviates from the reference by more than 0.1 m/s².
+Acceleration is bounded to [−2.0, +1.5], so 0.40 is roughly 11% of full range; steering rate
+is bounded to ±1.57 rad/s, so 0.69 is 22%.
 
-## 6. Zero-shot scalability and stress tests
+**Why they differ even with nobody around.** Pure pursuit is a myopic rule evaluated once:
+it computes the steering angle that would put the car on an arc through the target and then
+demands `(steer_target − steer_now) / dt`, which usually saturates the 90°/s rate limit. The
+MPC looks 0.8 s ahead, and its cost contains `0.015·‖u‖² + 0.04·‖u − u_prev‖²`, so it spreads
+the same turn over several steps instead of slamming the rack. It also weighs position error
+8, speed 3, heading 0.5 and steering 0.1 against each other, trading a little of one for less
+of another. Pure pursuit has no notion of that trade.
 
-```bash
-python -m arrival_final.study evaluate --root arrival_final/experiments/paper \
-  --cases fixed_3 fixed_5 fixed_8 fixed_10 density_5 density_8 density_10 \
-  --methods attention_mpc mean_mpc lattice_mpc --workers 1 --resume
+So the MPC does **two** things, not one:
 
-python -m arrival_final.study evaluate --root arrival_final/experiments/paper \
-  --cases unequal_3 --workers 1 --resume
+1. **Smooths and optimises the tracking** — worth 0.40 m/s² of difference in free space.
+2. **Enforces separation** — worth 1.71 m/s² when a car is in the way.
+
+The second is the larger effect, so "mostly collision avoidance" is a fair summary. But
+"identical apart from avoidance" is measurably false.
+
+**And there is a third thing, which the experiments show is the most important of all:
+training *with* the MPC in the loop produces a better policy than bolting it on afterwards.**
+Section 4 has the evidence.
+
+---
+
+## 1. The pipeline, end to end
+
+Three nested loops, none holding a plan longer than 1.2 seconds.
+
+```
+  every 0.20 s   ATTENTION POLICY          own goal, own state, shared deadline T,
+     (5 Hz)                                 up to K sensed neighbours
+                        |
+                        |  three numbers in [-1, 1]
+                        v
+  once per       PURE-PURSUIT ROLLOUT      simulate the bicycle forward 1.2 s
+  policy step                               -> 25 states x 24 controls, time-indexed
+                        |
+                        |  a TIMED reference: "be here at t0 + k*0.05 s"
+                        v
+  every 0.05 s   NONLINEAR MPC             track the reference over 0.8 s subject to
+   (20 Hz, x4)                              hard separation from every sensed car
+                        |
+                        |  [acceleration, steering rate]
+                        v
+  every 0.01 s   PLANT                     kinematic bicycle | dynamic bicycle | MuJoCo
+  (100 Hz, x5)
 ```
 
-Every actor was trained with three cars. No retraining occurs for 5, 8 or 10 cars.
-`fixed_*` uses a sampling square of half-width 6 m. `density_*` scales half-width
-as `6 sqrt(N/3)` m. `fixed_3` is the common reference for both studies. These test
-increasing crowding and approximately constant spatial density separately;
-interaction geometry still changes with team size. Team success is stricter for
-larger teams, so arrival fraction and per-car outcomes are retained too.
+### 1.1 What the policy sees and outputs
 
-KNN limits actor inputs to four visible neighbours within 5 m, with a mask.
-Attention and mean pooling share this selection. The **MPC uses all locally sensed
-neighbours**, with `N-1` allocated slots. Consequently a fixed-size actor does not
-imply constant MPC computation or a guarantee of zero-shot performance. Since
-training has only three cars, it exposes at most two neighbours per actor.
+Ten ego numbers, all in the car's own body frame, plus up to K neighbour rows of six:
 
-## 7. Frozen-policy transfer
-
-```bash
-python -m arrival_final.study evaluate --root arrival_final/experiments/paper \
-  --cases target_3 --plants dynamic mujoco \
-  --methods attention_pp attention_pp_mpc attention_mpc mean_mpc goal_mpc lattice_mpc \
-  --workers 1 --resume
-```
-
-Additional predefined stress plants are `dynamic_low_friction`, `dynamic_lag`, and
-`mujoco_low_friction`. Choose these explicitly rather than silently changing plant
-parameters. Start with the three-car transfer test before a larger transfer matrix.
-
-The MuJoCo adapter initializes requested pose, velocity, steering and wheel spin;
-reads actual state; checks planar stopping speed; and latches inter-car physical
-contacts at physics steps. Each process has its own generated scene. The scene is
-bundled with no external assets and has no static walls or obstacles, consistent
-with the nominal task. There is an actuator bridge from acceleration/steering rate
-to drive torque/steering servo. This bridge is part of the declared controller and
-must be described in transfer results. It is not retrained online.
-
-All plants use the same conservative footprint collision criterion, with MuJoCo
-physical contacts as an additional failure criterion. A footprint collision can
-terminate before actual body contact; do not interpret a zero contact rate alone
-as physical safety. Tyre/actuator parameters are simulation choices, not hardware
-identification. The MPC prediction model remains kinematic in every plant.
-
-## 8. Generate tables and figures
-
-```bash
-python -m arrival_final.report \
-  --results arrival_final/experiments/paper/results \
-  --runs arrival_final/experiments/paper/runs \
-  --output arrival_final/experiments/paper/report
-```
-
-Outputs include `RESULTS.md`, `results.csv`, `summary.json`, main comparison,
-scalability and validation-learning-curve figures in PNG/PDF when the corresponding
-data exist. Training seed mean/std and 95% bootstrap intervals are separate. The
-bootstrap resamples runs and paired missions within each scenario family; three
-seeds give limited information about training variability. A single-run interval
-is explicitly scenario-only. Paired comparisons with missing seed matches are
-marked skipped. Incomplete experiment groups show their actual run count.
-
-Family rates use the declared mixture, not raw counts from the balanced test set.
-Success/collision/timeout use all episodes. Timing error and arrival spread are
-conditional on all-car completion, including timing failures; they are never
-silently restricted to successes. Report both completion and timing errors.
-
-Every benchmark saves compressed trajectory traces at policy decision times:
-
-```bash
-python -m arrival_final.plot_episode --episode 0 \
-  --results \
-  arrival_final/experiments/paper/results/target_3__kinematic__attention_pp_s0.json \
-  arrival_final/experiments/paper/results/target_3__kinematic__attention_pp_mpc_s0.json \
-  arrival_final/experiments/paper/results/target_3__kinematic__attention_mpc_s0.json \
-  --output arrival_final/experiments/paper/report/paired_episode_0
-```
-
-This plots paths, goal distance and speed for one identical mission. Use examples
-from successes and failures; outcome captions are generated from saved data.
-5 Hz plotted trajectories are for visualization; collision checks use the finer
-physics steps. Runtime diagnostics include per-solver, sequential team-control,
-actor and entire simulation-step timings, with p95/max and overrun rates. These
-are wall-clock measurements on the recorded machine, not distributed-hardware
-latency or a real-time guarantee.
-
-## 9. Watch a checkpoint on your desktop
-
-Copy back the whole study or its run directory and use this same package version:
-
-```bash
-python -m arrival_final.view \
-  --checkpoint arrival_final/experiments/paper/runs/attention_mpc_s0/best.pt --speed 0.5
-
-# macOS native MuJoCo viewer:
-mjpython -m arrival_final.view_mujoco \
-  --checkpoint arrival_final/experiments/paper/runs/attention_mpc_s0/best.pt --speed 0.5
-```
-
-Space pauses, N draws another scenario, R replays in the Matplotlib viewer. Viewer
-runs are exploratory; use saved benchmark missions for paper metrics. An ordinary
-SSH shell does not provide a desktop window.
-
-## Implementation map and definitions
-
-See [PROTOCOL.md](PROTOCOL.md) for the equations, reward, success criteria and limits.
-
-| File | Responsibility |
+| ego | meaning |
 |---|---|
-| `config.py`, `scenarios.py`, `curriculum.py` | Task constants, sampling and training schedule |
-| `model.py`, `reference.py` | Bicycle dynamics, footprint and timed PP references |
-| `mpc.py` | Constrained single-shooting NMPC with CasADi derivatives and SciPy SLSQP |
-| `env.py` | Local sensing, nested clocks, physical execution, reward/events |
-| `mappo.py`, `train.py` | Shared attention/mean actor, centralized critic, PPO and checkpoints |
-| `plants.py`, `scene.py` | Independent kinematic/dynamic/MuJoCo plants |
-| `missions.py`, `study.py` | Frozen missions and independent job commands |
-| `baselines.py`, `tune_baseline.py` | Local non-learning comparators and validation selection |
-| `benchmark.py`, `report.py`, `plot_episode.py` | Paired evaluation, uncertainty and figures |
+| 0–1 | own goal, relative, body frame (÷10) |
+| 2–3 | own speed (÷2.0), own steering angle (÷27°) |
+| 4–5 | time remaining, the shared deadline T (÷20) |
+| 6–7 | own initial distance (÷10), arrived flag |
+| **8** | **required average speed** = distance / time remaining (÷2.0) |
+| **9** | **schedule error** = progress − elapsed fraction |
 
-The main change from your earlier trained folder is experimental reproducibility,
-plus a tyre-inclusive footprint and full horizon-node separation checks. These
-changes can alter performance. Retrain; do not reuse an earlier success rate as
-an `arrival_final` result. Deadlocks and timeouts remain possible and are measured.
+Rows 8 and 9 matter more than they look. They are *ratios*, derivable in principle from rows
+0–6, but a small tanh network approximating division across a wide input range does it badly.
+An earlier model without them had a correlation of only **+0.08** between the speed the
+schedule demanded and the speed it commanded, meaning it drove at a near-constant pace no
+matter what the deadline needed. Handing it the ratio removes the hardest part of the problem.
+
+Neighbour rows carry relative position, relative velocity and sin/cos of relative heading,
+with a presence mask. **Nothing about another car's goal, action or progress is visible.**
+
+Output, every 0.2 s:
+
+```
+forward  = 0.25 + (a0+1)/2 * 1.75     a waypoint 0.25 ... 2.0 m ahead
+lateral  = a1 * 1.2                    +-1.2 m to the side
+speed    = (a2+1)/2 * 2.0              preferred speed 0 ... 2 m/s
+```
+
+This is a **short-term intent**, replaced 0.2 s later. The waypoint is a via point to steer
+through, not a place to stop.
+
+The actor is attention-based: one shared encoder per neighbour, the ego queries them, and the
+result is a masked weighted sum. Nothing in the network has a shape that depends on K, so the
+same weights run three cars or ten. That is also why it generalises across scenario
+distributions: an earlier flat-MLP version scored 10% where the attention version scored 88%
+on the same unseen distribution.
+
+### 1.2 How the reference is generated
+
+Starting from the car's **measured** state, simulate the bicycle model forward 24 steps of
+0.05 s, driven by pure pursuit toward the decoded waypoint:
+
+```
+steer_target = atan( 2 * L * lateral_offset / distance^2 )      # arc through the target
+accel        = 4.0 * (target_speed - current_speed)
+target_speed = min( preferred,
+                    sqrt(2 * b * distance_to_goal),             # can still stop at the goal
+                    sqrt(2 * b * distance_to_waypoint) )        # and at the waypoint
+```
+
+Two properties make this the right interface:
+
+**It is feasible by construction.** The same model, the same actuator limits. Nothing in the
+reference is impossible for the car, so the MPC is never asked to chase a fantasy.
+
+**It is indexed by time, not by arc length.** Row *k* says where the car should be at
+`t0 + k·0.05 s`. That is what makes the next layer a *trajectory* tracker rather than a path
+follower: a car that drives the right curve too slowly is penalised, because reference row *k*
+has moved on without it.
+
+The rollout also switches from the waypoint to the goal once the goal is nearer, and brakes
+into it. Without that switch an untrained policy drives to its goal and straight past it, which
+was a real bug: it ended episodes 8.8 m from a goal it had already reached.
+
+### 1.3 How the MPC tracks it
+
+Single-shooting nonlinear MPC, 16 steps of 0.05 s. Decision variables are acceleration and
+steering rate at each step, 32 numbers, box-bounded by the actuator limits.
+
+```
+minimise   sum_k  8|p_k - p_ref,k|^2 + 3(v_k - v_ref,k)^2
+                + 0.5*wrap(yaw_k - yaw_ref,k)^2 + 0.1(steer_k - steer_ref,k)^2
+                + 0.015|u_k|^2 + 0.04|u_k - u_{k-1}|^2
+         + 16|p_H - p_ref,H|^2 + 6(v_H - v_ref,H)^2          (heavier terminal)
+
+s.t.     x_{k+1} = bicycle(x_k, u_k)                          same model, in CasADi
+         |d_a - d_b| >= 2*disc_radius + margin                 every disc pair, every
+                                                               `constraint_stride` steps
+```
+
+CasADi builds the cost and constraints **and their exact derivatives** once at construction;
+SLSQP solves them, warm-started from the previous solution shifted one step. Only the first
+control is applied. Typical solve 2–11 ms. On failure the car brakes straight.
+
+Note the cost contains **no notion of the deadline**. The MPC only knows "be at reference row
+*k* at step *k*". Timing reaches it entirely through the speeds the policy requested.
+
+### 1.4 The collision geometry (fixed late, and it mattered)
+
+The car is 0.537 × 0.245 m with the rear axle 0.164 m behind its centre. It used to be
+approximated by **one circle of radius 0.50 m centred on the rear axle**, which is correct but
+covers **4.8× the car's real area**, because a circle enclosing a long thin car has to be as
+wide as the car is long in every direction.
+
+It is now covered by circles laid **along the car's own axis**:
+
+| model | disc radius | required car-car gap | area reserved |
+|---|---|---|---|
+| 1 disc on the rear axle (old) | 0.449 m | 0.898 m | 4.8× |
+| 2 body discs | 0.182 m | 0.363 m | 1.6× |
+| **3 body discs (recommended)** | **0.152 m** | **0.303 m** | **1.6×** |
+
+More accurate *and* less restrictive at the same time. The measured effect, on the **same
+frozen checkpoint** with nothing retrained:
+
+| cars | collision model | success | arrived | collisions | timeouts | frozen cars |
+|---|---|---|---|---|---|---|
+| 3 | single disc (as trained) | 95% | 100% | 0% | 0% | 0/0 |
+| 3 | 3 body discs | 95% | 100% | 0% | 0% | 0/0 |
+| 6 | single disc (as trained) | **25%** | 30% | 0% | 70% | **71/72** |
+| 6 | 2 body discs | 75% | 95% | 0% | 5% | 2/2 |
+| 6 | **3 body discs** | **80%** | **100%** | **0%** | **0%** | **0/0** |
+
+At six cars, 71 of 72 non-arriving cars were **frozen at a dead stop**, 91% of them pinned
+exactly against the old 1.08 m bubble. Every car's MPC refused to approach, so nobody moved.
+Fixing the geometry took success from 25% to 80% with collisions still at zero.
+
+Cost: more constraint rows, so the separation is imposed every `constraint_stride` = 2 horizon
+steps rather than every step. The car moves under 0.1 m per step so nothing slips through, and
+the solve stays at 11 ms instead of 81 ms.
+
+---
+
+## 2. Results of the final model
+
+`runs/mpc_s0/best.pt`, 60 stratified held-out episodes:
+
+| metric | value |
+|---|---|
+| success (all within ±0.6 s of T, spread ≤ 0.6 s, no collision) | **75%** (peak 83% at step 860k) |
+| collisions | **0%**, at all 47 training evaluations |
+| all arrived | 88% |
+| arrival spread | 0.51 s |
+| worst separation ever | 1.079 m against a 1.08 m limit |
+
+**Per scenario family**, which localises everything:
+
+| family | success | arrived | collisions | timeout | spread |
+|---|---|---|---|---|---|
+| converging | **100%** | 100% | 0% | 0% | 0.11 s |
+| crossing | **100%** | 100% | 0% | 0% | 0.07 s |
+| parallel | **100%** | 100% | 0% | 0% | 0.08 s |
+| random | 70% | 85% | 0% | 15% | 0.51 s |
+| unequal | **22%** | 67% | 0% | 33% | 2.16 s |
+
+Three families solved outright. **All the remaining failure is in `unequal`**, where one car
+has a much shorter trip and must wait. 18% of arrivals are early and **zero are late**, which
+names the mechanism exactly: short-trip cars rush and then sit.
+
+Worth knowing about that family: its shortest trip averages **1.50 m** against a 15.4 s
+deadline, so that car finishes in under a second and must kill 14.6 seconds. That is a
+precision-loitering task rather than a coordination task. `--unequal-short-max 4.0` softens it
+to a ratio of 0.34, or `--family-weights` drops it entirely.
+
+### Sim2sim transfer, zero-shot, 25 paired episodes per row
+
+| plant | success | collisions | spread |
+|---|---|---|---|
+| kinematic (training model) | 96% | 0% | 0.18 s |
+| **MuJoCo F1TENTH** | **96%** | **0%** | **0.17 s** |
+| dynamic, μ = 0.6 | 84% | 4% | 0.30 s |
+| dynamic, μ = 0.3 | 84% | 0% | 0.29 s |
+| dynamic, lag 0.15/0.20 s | 72% | 0% | 0.29 s |
+| dynamic, lag 0.30/0.40 s | **20%** | 8% | 0.42 s |
+
+**MuJoCo matches the training model exactly.** A policy trained in a forty-line kinematic
+bicycle drives torque-controlled motors and servo steering racks with real tyre contacts, with
+nothing retrained and no measurable loss. Tyre friction never binds, down to μ = 0.3.
+**Actuator lag is the only thing that does**, failing above roughly a 0.25 s steering time
+constant. Real F1TENTH servos sit at 0.1–0.2 s, inside the working region.
+
+---
+
+## 3. Why transfer works at all
+
+Not adaptation: the weights are frozen and nothing is learned at deployment. Not the MPC
+either. The reason is the **decision rate against the model error**. Measured per 0.2 s policy
+step during real episodes, MuJoCo deviates from the kinematic prediction by about **one
+centimetre**, and an icy dynamic model by 1.3 cm. The policy chooses waypoints 0.25–2 m away,
+so a 1 cm error is under 1% of its smallest choice, and the next observation already contains
+it.
+
+This is a property of the operating regime and must be stated as scope. The same comparison
+while cornering hard: 0.9 cm of divergence per step at 1 m/s, 4.1 cm at 2 m/s, **21 cm at
+4 m/s**, 51 cm at 6 m/s. The tyre limit at μ = 0.8 is 7.8 m/s². **This pipeline is valid in
+the low-slip regime below roughly 3 m/s.**
+
+Division of labour under a new plant: the **MPC** owns spatial error inside a horizon under one
+second; the **policy** owns timing error across the whole episode, because every 0.2 s it
+re-reads remaining distance against remaining time and adjusts the requested speed.
+
+---
+
+## 4. The MPC ablation, and why training with it matters
+
+Four configurations, all measured:
+
+| configuration | success | collisions | spread |
+|---|---|---|---|
+| trained on PP, executed on PP | 52% | **22%** | 0.48 s |
+| trained on PP, **MPC swapped in** | 60% | **0%** | 0.72 s |
+| trained on MPC, executed on MPC (`arrival_mpc`) | 60% | 0% | 0.49 s |
+| **trained on MPC, executed on MPC (`mpc_s0`)** | **75%** | **0%** | 0.51 s |
+
+Three conclusions, in increasing order of importance.
+
+**The MPC eliminates collisions.** 22% → 0% on the identical policy and scenarios. This is the
+cleanest safety result in the project, because nothing is confounded with training: same
+weights, same seeds, only the executor differs.
+
+**Bolting it on afterwards is not free.** Timeouts rise 5% → 18% and spread degrades 0.48 →
+0.72 s. A PP-trained policy learned to dodge by itself because nothing else would, so adding a
+second avoidance system makes the pair over-conservative. Crashes become waiting.
+
+**Training with it beats bolting it on.** 75% versus 60%, same environment, same architecture.
+This is the answer to your question: the MPC is not a filter you can add at the end without
+cost. Its braking and swerving are part of the dynamics the policy learns, and a policy trained
+against it learns to *lean* on it, spending its capacity on timing rather than on avoidance
+it no longer has to do.
+
+There is also a clean negative result. Training with pure pursuit **alone** on the harder
+scenario set failed entirely: 0% success and 10–20% collisions, with the policy never
+converging (entropy still 1.30 at 921k steps against 0.24 for the MPC run). Without the
+constraint the policy must learn goal-reaching, timing and avoidance simultaneously, and one
+million steps is not enough. **The MPC does not merely make the system safe, it makes the
+learning problem tractable within a realistic budget.**
+
+---
+
+## 5. Honest assessment
+
+### Solid
+
+- 100% on three of five scenario families with zero collisions.
+- Zero collisions in every evaluation across a million steps, with the worst separation ever
+  recorded sitting exactly at the constraint limit. The safety layer does what it claims.
+- MuJoCo transfer at parity with the training model, zero-shot.
+- A clean four-way controller ablation, including the heterogeneous case.
+- Zero-shot scaling to six cars at 80% once the collision geometry is right.
+- The decentralisation claim is auditable: the actor reads only its own goal, its own state,
+  the shared deadline and relative neighbour states.
+
+### Not solid
+
+1. **One seed.** Your own history has a seed failing outright at 20% where siblings reached
+   100%. Two more seeds are the single highest-value remaining run.
+2. **Not converged.** 83% at 860k, 56% at 940k. `best.pt` captured a peak, not a plateau.
+3. **`unequal` at 22%.** Either soften it, drop it, or solve the loitering behaviour.
+4. **Small samples.** 20–60 episodes per cell. 100+ for anything in a paper.
+5. **The collision-model fix is untrained.** Every number above uses a checkpoint trained with
+   the old single disc. Retraining with three body discs should do better still, and the
+   current numbers understate the final system.
+6. **Perfect perception.** No sensor noise, no detection delay.
+
+### Missing for publication
+
+- A classical baseline a control audience respects: a centralised joint optimiser whose solve
+  time grows with N, and one reactive method such as ORCA with schedule speeds. The
+  hand-written baseline in `baseline.py` (23–37%) is a lower bound, not a competitor.
+- A counterfactual for the scalability claim: something that *fails* to scale in the same
+  setting, otherwise attention reads as an observation rather than a contribution.
+
+### Decided against, with measurements
+
+- **Training in MuJoCo.** It cannot improve a result already at parity, and it destroys the
+  sim2sim claim, which is the interesting part.
+- **A dynamic tyre model inside the MPC.** At 2 m/s the models differ by 1 cm per step, so it
+  would compute nearly the same commands 2–4× slower while requiring parameters to be
+  identified from hardware.
+- **Friction domain randomisation.** Friction was never the binding constraint; actuator lag
+  was, and that fix belongs in the MPC's prediction model.
+
+---
+
+## 6. Commands
+
+```bash
+# evaluate (per-family breakdown is in the JSON)
+python -m arrival_v2.evaluate --checkpoint runs/mpc_s0/best.pt --episodes 200 --output eval.json
+
+# watch it
+python3 -m arrival_v2.view --checkpoint runs/mpc_s0/best.pt --cars 6 --footprint-discs 3
+mjpython -m arrival_v2.view_mujoco --checkpoint runs/mpc_s0/best.pt --cars 6
+
+# sim2sim transfer table
+python -m arrival_v2.transfer --checkpoint runs/mpc_s0/best.pt --episodes 40 --extra
+
+# the no-learning baseline
+python -m arrival_v2.baseline --controller mpc --episodes 50
+
+# train, with the corrected geometry and the unequal family softened
+python -m arrival_v2.train --controller mpc --steps 1000000 --seed 1 \
+    --run-dir runs/mpc_s1 --unequal-short-max 4.0
+```

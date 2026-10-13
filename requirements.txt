@@ -1,0 +1,8 @@
+numpy
+scipy
+casadi
+torch
+matplotlib
+mujoco
+Pillow
+imageio

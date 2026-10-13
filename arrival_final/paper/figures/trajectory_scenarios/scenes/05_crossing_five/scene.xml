@@ -1,8 +1,0 @@
-<mujoco model="scene">
-    <include file="map.xml"/>
-    <include file="car0.xml"/>
-    <include file="car1.xml"/>
-    <include file="car2.xml"/>
-    <include file="car3.xml"/>
-    <include file="car4.xml"/>
-</mujoco>
