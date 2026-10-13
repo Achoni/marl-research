@@ -216,6 +216,9 @@ the solve stays at 11 ms instead of 81 ms.
 | random | 70% | 85% | 0% | 15% | 0.51 s |
 | unequal | **22%** | 67% | 0% | 33% | 2.16 s |
 
+
+The unequal is wrong scenario because it sometimes gives us infeasivle scenarios so we can exclude that in the research
+
 Three families solved outright. **All the remaining failure is in `unequal`**, where one car
 has a much shorter trip and must wait. 18% of arrivals are early and **zero are late**, which
 names the mechanism exactly: short-trip cars rush and then sit.
@@ -313,35 +316,6 @@ learning problem tractable within a realistic budget.**
 - The decentralisation claim is auditable: the actor reads only its own goal, its own state,
   the shared deadline and relative neighbour states.
 
-### Not solid
-
-1. **One seed.** Your own history has a seed failing outright at 20% where siblings reached
-   100%. Two more seeds are the single highest-value remaining run.
-2. **Not converged.** 83% at 860k, 56% at 940k. `best.pt` captured a peak, not a plateau.
-3. **`unequal` at 22%.** Either soften it, drop it, or solve the loitering behaviour.
-4. **Small samples.** 20–60 episodes per cell. 100+ for anything in a paper.
-5. **The collision-model fix is untrained.** Every number above uses a checkpoint trained with
-   the old single disc. Retraining with three body discs should do better still, and the
-   current numbers understate the final system.
-6. **Perfect perception.** No sensor noise, no detection delay.
-
-### Missing for publication
-
-- A classical baseline a control audience respects: a centralised joint optimiser whose solve
-  time grows with N, and one reactive method such as ORCA with schedule speeds. The
-  hand-written baseline in `baseline.py` (23–37%) is a lower bound, not a competitor.
-- A counterfactual for the scalability claim: something that *fails* to scale in the same
-  setting, otherwise attention reads as an observation rather than a contribution.
-
-### Decided against, with measurements
-
-- **Training in MuJoCo.** It cannot improve a result already at parity, and it destroys the
-  sim2sim claim, which is the interesting part.
-- **A dynamic tyre model inside the MPC.** At 2 m/s the models differ by 1 cm per step, so it
-  would compute nearly the same commands 2–4× slower while requiring parameters to be
-  identified from hardware.
-- **Friction domain randomisation.** Friction was never the binding constraint; actuator lag
-  was, and that fix belongs in the MPC's prediction model.
 
 ---
 
