@@ -1,0 +1,548 @@
+\documentclass[letterpaper,10pt,conference]{ieeeconf}
+
+\IEEEoverridecommandlockouts
+\overrideIEEEmargins
+
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage[hidelinks]{hyperref}
+
+% Keep the ieeeconf.cls supplied with this file in the same directory.
+% This draft combines the two supplied texts; references and results can
+% be added later. Author and affiliation information remains to be added.
+\title{\LARGE\bfseries
+Hierarchical Learning and Control for Synchronized Arrival
+under a Shared Deadline}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+\pagestyle{empty}
+
+\begin{abstract}
+We present a hierarchical learning and control framework for synchronized
+arrival of mobile robots at arbitrary preassigned goals under a shared
+deadline. A shared policy, trained using Multi-Agent Proximal Policy
+Optimization (MAPPO) with centralized training and decentralized execution,
+generates local waypoints and preferred speeds from each vehicle's own state,
+goal, timing information, and locally sensed neighbours. Pure-pursuit rollout
+converts these decisions into timed reference trajectories, which independent
+nonlinear model predictive control (NMPC) controllers track while accounting
+for actuator limits and predicted inter-vehicle separation. The controller
+operates inside the training loop, allowing the policy to learn coordination
+under the constraints and interventions encountered during execution. A
+masked attention encoder aggregates the nearest neighbours into a fixed-size
+representation, allowing the policy architecture to accommodate varying
+neighbourhood sizes. Scalability and robustness are assessed empirically.
+Online decisions require neither a centralized planner nor exchanged
+neighbour goals or future trajectories, given the supplied common deadline.
+We assess the contributions of learning and constrained control through
+matched comparisons of pure-pursuit execution, MPC added after policy
+training, and training with MPC in the loop, alongside a non-learning deadline
+controller. These experiments characterize the trade-offs between synchronized
+arrival, collision avoidance, and completion failures.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:introduction}
+
+The contribution is learning decentralized motion references that coordinate
+both route selection and speed so that mobile robots reach different assigned
+goals at a common deadline, while accounting for the behaviour of a
+constrained low-level controller.
+
+The architecture uses a hierarchical combination of reinforcement learning
+(RL) and nonlinear model predictive control (NMPC) to address the problem of
+simultaneous arrival, with robustness and scalability evaluated experimentally.
+
+% Expand the introduction and add related work with verified citations later.
+
+\section{Background and Preliminaries}
+\label{sec:background}
+
+\subsection{Decentralized Partially Observable Markov Decision Process}
+
+Multi-agent reinforcement learning (MARL) is based on reinforcement learning,
+in which an agent interacts with its environment and learns a policy that
+aims to maximize the expected cumulative reward.
+
+The problem is modelled as a decentralized partially observable Markov
+decision process (Dec-POMDP). In this work, with homogeneous agents and
+deterministic local observations, we write the Dec-POMDP as
+\begin{equation}
+    \mathcal{M}
+    = (\mathcal{S},\mathcal{A},\mathcal{O},R,P,\Omega,n,\gamma),
+\end{equation}
+where $\mathcal{S}$ is the global state space, $\mathcal{A}$ is the common
+action space of each agent, $\mathcal{O}$ is the local observation space,
+and $n$ is the number of agents. The local observation of agent $i$ at time
+step $t$ is
+\begin{equation}
+    o_{i,t} = \Omega(s_t,i).
+\end{equation}
+The joint action is
+\begin{equation}
+    \mathbf{a}_t = (a_{1,t},\ldots,a_{n,t}) \in \mathcal{A}^{n}.
+\end{equation}
+The transition model $P(s_{t+1}\mid s_t,\mathbf{a}_t)$ describes the
+probability of transitioning from $s_t$ to $s_{t+1}$ under the joint action.
+The shared reward is $r_t=R(s_t,\mathbf{a}_t)$, and $\gamma\in[0,1)$ is
+the discount factor.
+
+Agents use a shared policy $\pi_\theta(a_{i,t}\mid o_{i,t})$, parameterized
+by $\theta$, to produce an action from their own local observation. They
+jointly optimize the expected discounted cumulative reward:
+\begin{equation}
+    J_{\mathrm{RL}}(\theta)
+    = \mathbb{E}_{\pi_\theta,P}\!\left[
+        \sum_{t=0}^{H_{\mathrm{ep}}-1}\gamma^t r_t
+      \right],
+    \label{eq:rl-objective}
+\end{equation}
+where $H_{\mathrm{ep}}$ is the number of steps in an episode.
+
+\subsection{Centralized Training with Decentralized Execution}
+
+MARL algorithms can be categorized according to the information available
+during training and execution. During training, an algorithm may be
+restricted to the local information observed by each agent
+(decentralized training), or it may use information about all agents in
+the multi-agent system (centralized training).
+
+Centralized training with decentralized execution (CTDE) combines these
+information settings: training can use global information, while each agent
+uses only its permitted local information to make decisions during execution.
+
+Multi-Agent Proximal Policy Optimization (MAPPO) is an on-policy deep
+reinforcement learning algorithm that adopts the CTDE paradigm. In our
+implementation, a shared actor $\pi_\theta(a_{i,t}\mid o_{i,t})$ receives
+only agent $i$'s local observation and outputs that agent's action. A
+centralized critic with parameters $\phi$ receives the global state $s_t$,
+which is not supplied to the actor during execution. The critic is used
+during training to estimate values and compute advantages using generalized
+advantage estimation (GAE). We write its output as $V_\phi(s_t,i)$ because
+the implementation produces one value estimate per agent from the global
+state.
+
+\subsection{Rollout Collection and Policy Probability Ratio}
+
+Initially, the algorithm collects a sequence of experiences called a
+rollout. It stores local observations, global states, sampled latent actions,
+old action log-probabilities, critic values, rewards, next-state values,
+termination and rollout-boundary flags, and active-agent masks. The latent
+Gaussian actions are transformed using $\tanh$ to obtain bounded policy
+actions. The policy log-probabilities account for this transformation.
+
+Proximal Policy Optimization (PPO) needs to measure how much the new policy
+differs from the policy that generated the rollout. It therefore uses the
+probability ratio
+\begin{equation}
+    \rho_{i,t}(\theta)
+    = \frac{\pi_\theta(a_{i,t}\mid o_{i,t})}
+            {\pi_{\theta_{\mathrm{old}}}(a_{i,t}\mid o_{i,t})},
+    \label{eq:probability-ratio}
+\end{equation}
+or, equivalently,
+\begin{equation}
+\begin{aligned}
+    \rho_{i,t}(\theta)
+    = \exp\!\bigl(&\log\pi_\theta(a_{i,t}\mid o_{i,t})\\
+                 &-\log\pi_{\theta_{\mathrm{old}}}(a_{i,t}\mid o_{i,t})\bigr),
+\end{aligned}
+\end{equation}
+where $\theta_{\mathrm{old}}$ denotes the parameters used to collect the
+rollout. Both probabilities are evaluated for the same collected action
+and observation.
+
+\subsection{Returns and Generalized Advantage Estimation}
+
+The discounted return from time step $t$ is
+\begin{equation}
+\begin{aligned}
+    G_t
+    &= \sum_{k=t}^{H_{\mathrm{ep}}-1}\gamma^{k-t}r_k\\
+    &= r_t + \gamma r_{t+1} + \gamma^2 r_{t+2} + \cdots.
+\end{aligned}
+    \label{eq:discounted-return}
+\end{equation}
+For the collected rollout, GAE estimates how much better an action was
+than the critic's value prediction. First, we compute the temporal-difference
+error:
+\begin{equation}
+\begin{aligned}
+    \delta_{i,t}
+    ={}& r_t + \gamma(1-d_t)V_{\phi_{\mathrm{old}}}(s_{t+1},i)\\
+       &-V_{\phi_{\mathrm{old}}}(s_t,i),
+\end{aligned}
+    \label{eq:td-error}
+\end{equation}
+where $d_t=1$ if the task terminates after the transition, and $d_t=0$
+otherwise. Thus, a true terminal transition does not bootstrap from a
+next-state value. The subscript $\phi_{\mathrm{old}}$ indicates that
+these are the fixed critic estimates collected before the update.
+
+The GAE advantages are computed backwards through the rollout:
+\begin{equation}
+\begin{aligned}
+    \widehat{A}_{i,t}
+    &= \delta_{i,t}
+      + \gamma\lambda(1-d_t)(1-b_t)\widehat{A}_{i,t+1},\\
+    \widehat{A}_{i,H}&=0,
+\end{aligned}
+    \label{eq:gae}
+\end{equation}
+where $H$ is the rollout length, $\lambda\in[0,1]$ controls the GAE
+weighting, and $b_t=1$ marks an artificial rollout or curriculum boundary.
+Such a boundary stops the advantage recursion but retains the next-state
+bootstrap in~\eqref{eq:td-error} when the task has not terminated.
+
+\subsection{Critic Loss and PPO Clipped Objective}
+
+The critic's regression target is the GAE-based return estimate
+\begin{equation}
+    \widehat{G}_{i,t}
+    = \widehat{A}_{i,t} + V_{\phi_{\mathrm{old}}}(s_t,i).
+    \label{eq:value-target}
+\end{equation}
+The critic is trained by minimizing the value loss
+\begin{equation}
+    \mathcal{L}_{V}(\phi)
+    = \frac{1}{2}\,
+      \mathbb{E}_{(i,t)\sim\mathcal{B}}\!\left[
+        \bigl(V_\phi(s_t,i)-\widehat{G}_{i,t}\bigr)^2
+      \right],
+    \label{eq:critic-loss}
+\end{equation}
+where $\mathcal{B}$ denotes the collected agent--time samples. The return
+targets are held fixed during the optimization update.
+
+The actor uses the advantages to form the PPO clipped objective. Let
+$\widetilde{A}_{i,t}$ denote the advantages normalized over active decision
+samples when their variance is nonzero, and define
+\begin{equation}
+    \overline{\rho}_{i,t}(\theta)
+    = \operatorname{clip}\bigl(\rho_{i,t}(\theta),1-\epsilon,1+\epsilon\bigr).
+\end{equation}
+Then
+\begin{equation}
+\begin{aligned}
+    \mathcal{L}_{\mathrm{clip}}(\theta)
+    = \mathbb{E}_{(i,t)\sim\mathcal{B}_{\mathrm{active}}}\!\Bigl[
+        \min\bigl(&\rho_{i,t}(\theta)\widetilde{A}_{i,t},\\
+                 &\overline{\rho}_{i,t}(\theta)\widetilde{A}_{i,t}\bigr)
+      \Bigr],
+\end{aligned}
+    \label{eq:ppo-clipping}
+\end{equation}
+where $\epsilon>0$ is the clipping parameter and
+$\mathcal{B}_{\mathrm{active}}$ contains samples from agents that were
+active when their actions were selected. The actor maximizes this objective.
+Clipping limits the incentive for large policy changes in the surrogate
+objective; it does not impose a hard bound on every probability ratio.
+
+The implementation combines the actor objective, critic loss, and an entropy
+bonus into the loss that is minimized:
+\begin{equation}
+\begin{aligned}
+    \mathcal{L}(\theta,\phi)
+    ={}&-\mathcal{L}_{\mathrm{clip}}(\theta)
+        +c_V\mathcal{L}_{V}(\phi)\\
+       &-c_H\,\mathbb{E}_{(i,t)\sim\mathcal{B}_{\mathrm{active}}}\!\left[
+          \mathcal{H}\bigl(\pi_\theta(\cdot\mid o_{i,t})\bigr)
+        \right],
+\end{aligned}
+    \label{eq:combined-loss}
+\end{equation}
+where $c_V$ and $c_H$ weight the value loss and policy entropy, respectively.
+The entropy term encourages exploration. The actor and critic are updated
+using minibatches from the rollout, while the stored old log-probabilities,
+advantages, and return targets remain fixed during these updates.
+
+\section{Method: Hierarchical Control Pipeline}
+\label{sec:method}
+
+The complete control pipeline is
+\begin{equation}
+\begin{gathered}
+\text{Observation}\rightarrow\text{MAPPO}\rightarrow\text{Pure pursuit}\\
+\rightarrow\text{NMPC}\rightarrow\text{Vehicle}.
+\end{gathered}
+\end{equation}
+The three main frequencies are $5~\mathrm{Hz}$ for the MAPPO actor,
+$20~\mathrm{Hz}$ for NMPC, and $100~\mathrm{Hz}$ for the plant simulation.
+The low-level controller operates inside the training loop so that the actor
+learns under the controller's constraints and interventions.
+
+In this section, $\mathbf{x}_k$ denotes one vehicle's state, whereas $s_t$
+in Section~\ref{sec:background} denotes the global MARL state. The index $k$
+denotes a local prediction step within a controller horizon.
+
+\subsection{MAPPO Action and Waypoint Generation}
+
+Every $0.2~\mathrm{s}$, the shared MAPPO actor receives the vehicle's current
+local observation, including its state, goal, deadline, schedule information,
+and nearby vehicles. The bounded action is
+\begin{equation}
+    a_t^{\mathrm{RL}}
+    = \begin{bmatrix}
+        a_{0,t}^{\mathrm{RL}} & a_{1,t}^{\mathrm{RL}} & a_{2,t}^{\mathrm{RL}}
+      \end{bmatrix}^{\!\top},
+    \qquad a_{q,t}^{\mathrm{RL}}\in[-1,1].
+\end{equation}
+The action components are decoded as
+\begin{align}
+    d_f &= 0.25 + \frac{a_{0,t}^{\mathrm{RL}}+1}{2}(1.75),\\
+    d_l &= 1.2a_{1,t}^{\mathrm{RL}},\\
+    v_{\mathrm{pref}} &= \frac{a_{2,t}^{\mathrm{RL}}+1}{2}(2.0).
+\end{align}
+Here, $d_f\in[0.25,2.0]~\mathrm{m}$ is the forward waypoint distance,
+$d_l\in[-1.2,1.2]~\mathrm{m}$ is the lateral waypoint offset, and
+$v_{\mathrm{pref}}\in[0,2.0]~\mathrm{m/s}$ is the preferred speed.
+Thus, the actor specifies a local waypoint and a preferred speed.
+
+\subsection{Pure-Pursuit Reference Generation}
+
+The vehicle state is
+\begin{equation}
+    \mathbf{x}_k
+    = \begin{bmatrix}
+        p_{x,k} & p_{y,k} & \psi_k & v_k & \delta_k
+      \end{bmatrix}^{\!\top},
+\end{equation}
+where $p_{x,k}$ and $p_{y,k}$ denote position, $\psi_k$ is heading,
+$v_k$ is speed, and $\delta_k$ is the steering angle.
+The reference rollout starts from the current measured state:
+\begin{equation}
+    \mathbf{x}^{\mathrm{ref}}_0 = \mathbf{x}_{\mathrm{measured}}.
+\end{equation}
+
+Using the MAPPO waypoint, pure pursuit computes a target steering angle.
+Before applying steering limits, its geometric expression is
+\begin{equation}
+    \delta_{\mathrm{target},k}
+    = \tan^{-1}\!\left(\frac{2L y_{\mathrm{local},k}}{d_k^2}\right),
+\end{equation}
+where $L$ is the wheelbase, $d_k$ is the distance from the predicted vehicle
+position to the current pursuit target, and $y_{\mathrm{local},k}$ is the
+target's lateral coordinate in the predicted vehicle frame. Initially,
+when pursuing the decoded waypoint, $y_{\mathrm{local},0}=d_l$. These
+relative quantities are recomputed as the reference rollout advances.
+
+The longitudinal acceleration is generated by speed feedback:
+\begin{equation}
+    a_k^{\mathrm{PP}} = 4\bigl(v_{\mathrm{target},k}-v_k^{\mathrm{ref}}\bigr),
+\end{equation}
+where $v_{\mathrm{target},k}$ is the preferred speed after the reference
+generator's speed caps. The steering-rate command moves the steering angle
+towards $\delta_{\mathrm{target},k}$, subject to the control limits.
+
+Pure pursuit propagates the bicycle model for $24$ steps:
+\begin{equation}
+    \mathbf{x}_{k+1}^{\mathrm{ref}}
+    = f(\mathbf{x}_k^{\mathrm{ref}},u_k^{\mathrm{PP}}),
+    \qquad k=0,\ldots,23,
+\end{equation}
+with $\Delta t=0.05~\mathrm{s}$. Therefore, it generates a
+$1.2~\mathrm{s}$ timed reference:
+\begin{equation}
+    X^{\mathrm{ref}}
+    = \bigl[\mathbf{x}_0^{\mathrm{ref}},
+             \mathbf{x}_1^{\mathrm{ref}},\ldots,
+             \mathbf{x}_{24}^{\mathrm{ref}}\bigr].
+\end{equation}
+The rollout also produces the corresponding nominal controls
+$[u_0^{\mathrm{PP}},\ldots,u_{23}^{\mathrm{PP}}]$.
+Each reference state specifies where the vehicle should approximately be
+at a particular future time, rather than only a point along an untimed path.
+
+\subsection{NMPC Control Input and Prediction}
+
+The NMPC control input is
+\begin{equation}
+    u_k = \begin{bmatrix}a_k & \dot{\delta}_k\end{bmatrix}^{\!\top},
+\end{equation}
+where $a_k$ is longitudinal acceleration and $\dot{\delta}_k$ is steering
+rate. This is the low-level command optimized by NMPC and is distinct from
+the MAPPO waypoint-and-speed action.
+
+The NMPC horizon contains $N=16$ control steps. Since
+$\Delta t=0.05~\mathrm{s}$, its duration is
+\begin{equation}
+    T_H=N\Delta t=16(0.05)=0.8~\mathrm{s}.
+\end{equation}
+NMPC optimizes the control sequence
+\begin{equation}
+    U=[u_0,u_1,\ldots,u_{N-1}]\in\mathbb{R}^{2\times N}.
+\end{equation}
+There are $32$ scalar decision variables because each of the $16$ controls
+contains two components.
+
+For each candidate $U$, prediction starts from the current measured state
+and propagates the nonlinear bicycle model:
+\begin{align}
+    \mathbf{x}_0 &= \mathbf{x}_{\mathrm{measured}},\\
+    \mathbf{x}_{k+1} &= f(\mathbf{x}_k,u_k),
+    \qquad k=0,\ldots,N-1.
+\end{align}
+The resulting trajectory is
+\begin{equation}
+    X(U)=[\mathbf{x}_0,\mathbf{x}_1,\ldots,\mathbf{x}_N].
+\end{equation}
+The predicted states are not independent optimization variables. They are
+generated from the candidate controls through the bicycle model. This is
+a single-shooting formulation.
+
+\subsection{NMPC Objective Function}
+
+Let $p_k=[p_{x,k},p_{y,k}]^\top$. NMPC compares its predicted states with
+the pure-pursuit reference states at the corresponding future times.
+Define the errors
+\begin{align}
+    e_{p,k} &= p_k-p_k^{\mathrm{ref}},\\
+    e_{v,k} &= v_k-v_k^{\mathrm{ref}},\\
+    e_{\delta,k} &= \delta_k-\delta_k^{\mathrm{ref}},\\
+    e_{\psi,k} &= \operatorname{atan2}\bigl(
+       \sin(\psi_k-\psi_k^{\mathrm{ref}}),
+       \cos(\psi_k-\psi_k^{\mathrm{ref}})\bigr).
+\end{align}
+The wrapped heading error accounts for the equivalence of angles differing
+by $2\pi$. All reference quantities here belong to the time-aligned window
+used by the current NMPC solve.
+
+The objective function is
+\begin{equation}
+\begin{aligned}
+    J_{\mathrm{MPC}}(U)=\sum_{k=0}^{N-1}\Bigl(
+        &8\|e_{p,k+1}\|^2+3e_{v,k+1}^{2}\\
+        &+0.5e_{\psi,k+1}^{2}+0.1e_{\delta,k+1}^{2}\\
+        &+0.015\|u_k\|^2\\
+        &+0.04\|u_k-u_{k-1}\|^2\Bigr)\\
+        &+J_{\mathrm{terminal}},
+\end{aligned}
+    \label{eq:mpc-cost}
+\end{equation}
+where $u_{-1}$ is the control command applied during the previous NMPC
+step. The terminal cost gives additional importance to the final predicted
+position and speed:
+\begin{equation}
+    J_{\mathrm{terminal}}=16\|e_{p,N}\|^2+6e_{v,N}^{2}.
+    \label{eq:terminal-cost}
+\end{equation}
+
+\subsection{Why NMPC Can Differ from Pure Pursuit}
+
+Pure pursuit generates a nominal trajectory under the bicycle model and
+its control limits. If NMPC used only a tracking-error objective, started
+from the same state, and used the same model, the nominal pure-pursuit
+controls could reproduce the reference exactly, provided that they also
+satisfied all NMPC constraints.
+
+However, the objective in~\eqref{eq:mpc-cost} also includes
+\begin{equation}
+    0.015\|u_k\|^2+0.04\|u_k-u_{k-1}\|^2.
+\end{equation}
+The first term penalizes large acceleration and steering-rate commands.
+The second penalizes large changes between consecutive controls. NMPC
+may therefore accept a small tracking error in exchange for a smoother,
+lower-effort control sequence. Separation constraints can also require a
+departure from the nominal reference. Consequently, the NMPC command need
+not equal the pure-pursuit command even when both use the same bicycle model.
+
+Pure pursuit computes how to steer towards the current target. NMPC instead
+optimizes a sequence of controls over the next $0.8~\mathrm{s}$, balancing
+tracking, effort, smoothness, and constraints.
+
+\subsection{Collision-Avoidance Constraints}
+
+NMPC also considers nearby vehicles. For vehicle $i$ and a sensed neighbour
+$j$, the separation constraint can be written schematically as
+\begin{equation}
+    d_{ij,k}\geq d_{\mathrm{safe}},
+\end{equation}
+where $d_{ij,k}$ denotes predicted separation and $d_{\mathrm{safe}}$ is the
+required safety distance. Let $\mathcal{N}_i$ denote the sensed neighbours
+considered by vehicle $i$. The constrained problem has the form
+\begin{equation}
+\begin{aligned}
+    U^*\in\operatorname*{arg\,min}_{U}\quad
+        &J_{\mathrm{MPC}}(U)\\
+    \text{subject to}\quad
+        &\mathbf{x}_0=\mathbf{x}_{\mathrm{measured}},\\
+        &\mathbf{x}_{k+1}=f(\mathbf{x}_k,u_k),\\
+        &u_{\min}\leq u_k\leq u_{\max},\\
+        &d_{ij,k+1}\geq d_{\mathrm{safe}},\quad j\in\mathcal{N}_i,
+\end{aligned}
+    \label{eq:mpc-problem}
+\end{equation}
+for $k=0,\ldots,N-1$. In the single-shooting implementation, the dynamics
+are enforced by the rollout itself. The separation constraints apply to
+predicted states at the sampled horizon times.
+% Specify the exact body geometry, neighbour prediction, state bounds,
+% feasibility tolerance, and failure handling from the final implementation.
+
+\subsection{Optimization Process}
+
+The optimizer starts from an initial candidate control sequence $U^{(0)}$.
+For this candidate, the prediction model and objective produce
+\begin{equation}
+    U^{(0)}\rightarrow X(U^{(0)})\rightarrow J_{\mathrm{MPC}}(U^{(0)}).
+\end{equation}
+The optimizer then modifies the controls through successive candidates
+$U^{(1)},U^{(2)},\ldots$, seeking to reduce the objective while satisfying
+the constraints. Thus, each candidate is evaluated by propagating the bicycle
+model, comparing the predicted trajectory with the timed reference, and
+checking the constraints.
+
+The resulting optimized plan is
+\begin{equation}
+    U^*=[u_0^*,u_1^*,\ldots,u_{N-1}^*].
+\end{equation}
+Since the problem is nonlinear, the numerical solver generally seeks a local
+solution; the notation $U^*$ does not imply a certified global optimum.
+
+\subsection{Receding-Horizon Control}
+
+Although NMPC calculates $16$ future controls, only the first is applied:
+\begin{equation}
+    u_{\mathrm{applied}}=u_0^*
+    =\begin{bmatrix}a_0^* & \dot{\delta}_0^*\end{bmatrix}^{\!\top}.
+\end{equation}
+The remaining controls allow the optimizer to evaluate the future
+consequences of the first command. After $0.05~\mathrm{s}$, the vehicle state
+is measured again, the prediction is initialized with the new measurement,
+and the optimization is solved again.
+
+This repeated sequence of measurement, prediction, optimization, and
+application of the first command is called receding-horizon control.
+
+\subsection{Timing of the Complete Pipeline}
+
+At $t=0$, MAPPO generates $[d_f,d_l,v_{\mathrm{pref}}]$, pure pursuit
+generates a $1.2~\mathrm{s}$ reference, and NMPC solves its
+$0.8~\mathrm{s}$ optimization problem. NMPC solves again at
+$t=0.05$, $0.10$, and $0.15~\mathrm{s}$ using the latest measured state
+and the corresponding time-aligned reference window. At $t=0.20~\mathrm{s}$,
+MAPPO generates a new action and pure pursuit generates a new reference.
+
+Thus, each policy interval contains four NMPC updates. Each NMPC interval
+contains five plant simulation steps of $0.01~\mathrm{s}$. The new measured
+vehicle state supplies feedback to the next controller update.
+
+\subsection{Division of Responsibilities}
+
+MAPPO decides where to move and how fast, using the vehicle's permitted local
+information. Pure pursuit converts that decision into a timed nominal
+trajectory under the bicycle model. NMPC tracks the trajectory while
+balancing smoothness and control effort and enforcing its constraints on
+the predicted motion. The plant evolves under the applied command and
+provides the next measured state.
+
+The hierarchy therefore maps a coordination decision to a timed reference
+trajectory and then to a physical control command.
+
+% Add experimental setup, results, discussion, conclusion, and bibliography
+% when those parts of the paper are ready.
+
+\end{document}

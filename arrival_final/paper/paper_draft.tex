@@ -1,0 +1,233 @@
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage[hidelinks]{hyperref}
+
+% Working draft: replace this provisional title and add author information later.
+% This is a standalone draft, not a conference-formatted submission.
+\title{Hierarchical Learning and Control for Synchronized Arrival\newline
+under a Shared Deadline}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present a hierarchical learning and control framework for synchronized
+arrival of mobile robots at arbitrary preassigned goals under a shared
+deadline. A shared policy, trained using Multi-Agent Proximal Policy
+Optimization (MAPPO) with centralized training and decentralized execution,
+generates local waypoints and preferred speeds from each vehicle's own state,
+goal, timing information, and locally sensed neighbours. Pure-pursuit rollout
+converts these decisions into timed reference trajectories, which independent
+nonlinear model predictive control (NMPC) controllers track while accounting
+for actuator limits and predicted inter-vehicle separation. The controller
+operates inside the training loop, allowing the policy to learn coordination
+under the constraints and interventions encountered during execution. A
+masked attention encoder aggregates the nearest neighbours into a fixed-size
+representation, allowing the policy architecture to accommodate varying
+neighbourhood sizes. Scalability and robustness are assessed empirically.
+Online decisions require neither a centralized planner nor exchanged
+neighbour goals or future trajectories, given the supplied common deadline.
+We assess the contributions of learning and constrained control through
+matched comparisons of pure-pursuit execution, MPC added after policy
+training, and training with MPC in the loop, alongside a non-learning deadline
+controller. These experiments characterize the trade-offs between synchronized
+arrival, collision avoidance, and completion failures.
+\end{abstract}
+
+\section{Introduction and Related Work}
+\label{sec:introduction}
+% Add the introduction, related work, and verified citations here later.
+
+\section{Contribution}
+\label{sec:contribution}
+
+The contribution is learning decentralized motion references that coordinate
+both route selection and speed so that mobile robots reach different assigned
+goals at a common deadline, while accounting for the behaviour of a
+constrained low-level controller.
+
+The architecture uses a hierarchical combination of RL and NMPC to address
+the problem of simultaneous arrival, with robustness and scalability
+evaluated experimentally.
+
+\section{Problem Formulation and Background}
+\label{sec:background}
+
+Multi-agent reinforcement learning (MARL) is based on reinforcement learning
+(RL), in which an agent interacts with its environment and learns a policy
+that aims to maximize the expected cumulative reward.
+
+The problem is modelled as a decentralized partially observable Markov
+decision process (Dec-POMDP). In this work, with homogeneous agents and
+deterministic local observations, we write the Dec-POMDP as
+\begin{equation}
+    \mathcal{M}
+    = (\mathcal{S},\mathcal{A},\mathcal{O},R,P,\Omega,n,\gamma),
+\end{equation}
+where $\mathcal{S}$ is the global state space, $\mathcal{A}$ is the common
+action space of each agent, $\mathcal{O}$ is the local observation space,
+and $n$ is the number of agents. The local observation of agent $i$ at time
+step $t$ is
+\begin{equation}
+    o_{i,t} = \Omega(s_t,i).
+\end{equation}
+The joint action is
+\begin{equation}
+    \mathbf{a}_t = (a_{1,t},\ldots,a_{n,t}) \in \mathcal{A}^{n}.
+\end{equation}
+The transition model $P(s_{t+1}\mid s_t,\mathbf{a}_t)$ describes the
+probability of transitioning from $s_t$ to $s_{t+1}$ under the joint action.
+The shared reward is $r_t=R(s_t,\mathbf{a}_t)$, and $\gamma\in[0,1)$ is
+the discount factor.
+
+Agents use a shared policy $\pi_\theta(a_{i,t}\mid o_{i,t})$, parameterized
+by $\theta$, to produce an action from their own local observation. They
+jointly optimize the expected discounted cumulative reward:
+\begin{equation}
+    J(\theta)
+    = \mathbb{E}_{\pi_\theta,P}\!\left[
+        \sum_{t=0}^{H_{\mathrm{ep}}-1}\gamma^t r_t
+      \right],
+    \label{eq:rl-objective}
+\end{equation}
+where $H_{\mathrm{ep}}$ is the number of steps in an episode.
+
+MARL algorithms can be categorized according to the information available
+during training and execution. During training, an algorithm may be
+restricted to the local information observed by each agent
+(decentralized training), or it may use information about all agents in
+the multi-agent system (centralized training).
+
+Centralized training with decentralized execution (CTDE) combines these
+information settings: training can use global information, while each agent
+uses only its permitted local information to make decisions during execution.
+
+MAPPO is an on-policy deep reinforcement learning algorithm that adopts
+the CTDE paradigm. In our implementation, a shared actor
+$\pi_\theta(a_{i,t}\mid o_{i,t})$ receives only agent $i$'s local
+observation and outputs that agent's action. A centralized critic with
+parameters $\phi$ receives the global state $s_t$, which is not supplied
+to the actor during execution. The critic is used during training to
+estimate values and compute advantages using generalized advantage
+estimation (GAE). We write its output as $V_\phi(s_t,i)$ because the
+implementation produces one value estimate per agent from the global state.
+
+Initially, the algorithm collects a sequence of experiences called a
+rollout. It stores local observations, global states, sampled latent actions,
+old action log-probabilities, critic values, rewards, next-state values,
+termination and rollout-boundary flags, and active-agent masks. The latent
+Gaussian actions are transformed using $\tanh$ to obtain bounded policy
+actions. The policy log-probabilities account for this transformation.
+
+PPO needs to measure how much the new policy differs from the policy that
+generated the rollout. It therefore uses the probability ratio
+\begin{align}
+    \rho_{i,t}(\theta)
+    &= \frac{\pi_\theta(a_{i,t}\mid o_{i,t})}
+            {\pi_{\theta_{\mathrm{old}}}(a_{i,t}\mid o_{i,t})}
+       \label{eq:probability-ratio} \\
+    &= \exp\!\left(
+        \log\pi_\theta(a_{i,t}\mid o_{i,t})
+        -\log\pi_{\theta_{\mathrm{old}}}(a_{i,t}\mid o_{i,t})
+       \right),
+\end{align}
+where $\theta_{\mathrm{old}}$ denotes the parameters used to collect the
+rollout. Both probabilities are evaluated for the same collected action
+and observation.
+
+The discounted return from time step $t$ is
+\begin{equation}
+    G_t
+    = \sum_{k=t}^{H_{\mathrm{ep}}-1}\gamma^{k-t}r_k
+    = r_t + \gamma r_{t+1} + \gamma^2 r_{t+2} + \cdots.
+    \label{eq:discounted-return}
+\end{equation}
+For the collected rollout, GAE estimates how much better an action was
+than the critic's value prediction. First, we compute the temporal-difference
+error:
+\begin{equation}
+    \delta_{i,t}
+    = r_t
+      + \gamma(1-d_t)V_{\phi_{\mathrm{old}}}(s_{t+1},i)
+      - V_{\phi_{\mathrm{old}}}(s_t,i),
+    \label{eq:td-error}
+\end{equation}
+where $d_t=1$ if the task terminates after the transition, and $d_t=0$
+otherwise. Thus, a true terminal transition does not bootstrap from a
+next-state value. The subscript $\phi_{\mathrm{old}}$ indicates that
+these are the fixed critic estimates collected before the update.
+
+The GAE advantages are computed backwards through the rollout:
+\begin{equation}
+    \widehat{A}_{i,t}
+    = \delta_{i,t}
+      + \gamma\lambda(1-d_t)(1-b_t)\widehat{A}_{i,t+1},
+    \qquad \widehat{A}_{i,H}=0,
+    \label{eq:gae}
+\end{equation}
+where $H$ is the rollout length, $\lambda\in[0,1]$ controls the GAE
+weighting, and $b_t=1$ marks an artificial rollout or curriculum boundary.
+Such a boundary stops the advantage recursion but retains the next-state
+bootstrap in~\eqref{eq:td-error} when the task has not terminated.
+
+The critic's regression target is the GAE-based return estimate
+\begin{equation}
+    \widehat{G}_{i,t}
+    = \widehat{A}_{i,t} + V_{\phi_{\mathrm{old}}}(s_t,i).
+    \label{eq:value-target}
+\end{equation}
+The critic is trained by minimizing the value loss
+\begin{equation}
+    \mathcal{L}_{V}(\phi)
+    = \frac{1}{2}\,
+      \mathbb{E}_{(i,t)\sim\mathcal{B}}\!\left[
+        \bigl(V_\phi(s_t,i)-\widehat{G}_{i,t}\bigr)^2
+      \right],
+    \label{eq:critic-loss}
+\end{equation}
+where $\mathcal{B}$ denotes the collected agent--time samples. The return
+targets are held fixed during the optimization update.
+
+The actor uses the advantages to form the PPO clipped objective. Let
+$\widetilde{A}_{i,t}$ denote the advantages normalized over active decision
+samples when their variance is nonzero. Then
+\begin{equation}
+    \mathcal{L}_{\mathrm{clip}}(\theta)
+    = \mathbb{E}_{(i,t)\sim\mathcal{B}_{\mathrm{active}}}\!\left[
+        \min\!\left(
+          \rho_{i,t}(\theta)\widetilde{A}_{i,t},\,
+          \operatorname{clip}\!\left(
+            \rho_{i,t}(\theta),1-\epsilon,1+\epsilon
+          \right)\widetilde{A}_{i,t}
+        \right)
+      \right],
+    \label{eq:ppo-clipping}
+\end{equation}
+where $\epsilon>0$ is the clipping parameter and
+$\mathcal{B}_{\mathrm{active}}$ contains samples from agents that were
+active when their actions were selected. The actor maximizes this objective.
+Clipping limits the incentive for large policy changes in the surrogate
+objective; it does not impose a hard bound on every probability ratio.
+
+The implementation combines the actor objective, critic loss, and an entropy
+bonus into the loss that is minimized:
+\begin{equation}
+    \mathcal{L}(\theta,\phi)
+    = -\mathcal{L}_{\mathrm{clip}}(\theta)
+      + c_V\mathcal{L}_{V}(\phi)
+      - c_H\,\mathbb{E}_{(i,t)\sim\mathcal{B}_{\mathrm{active}}}\!\left[
+          \mathcal{H}\bigl(\pi_\theta(\cdot\mid o_{i,t})\bigr)
+        \right],
+    \label{eq:combined-loss}
+\end{equation}
+where $c_V$ and $c_H$ weight the value loss and policy entropy, respectively.
+The entropy term encourages exploration. The actor and critic are updated
+using minibatches from the rollout, while the stored old log-probabilities,
+advantages, and return targets remain fixed during these updates.
+
+\end{document}

@@ -1,0 +1,1392 @@
+{
+  "checkpoint": "runs/mpc_s0/best.pt",
+  "checkpoint_sha256": "3face305c230cb088dfc954d315f3e8732eab419c027f0c6d8de56a7674ebe85",
+  "checkpoint_training_step": 860000,
+  "runtime_package": "arrival_v2",
+  "runtime_source_sha256": {
+    "__init__.py": "2943c2e4ded26b19eede161b20156a65cf41eebbe0a1c55b1dc3a183bc8dcb3b",
+    "baseline.py": "9161f9f2a802c2709c67775f4d7c1b0f20c46df7d193c03771a63260070c65ac",
+    "config.py": "3f8468278dc36b37cf170be1574ecf8266cff4221b82f12b5c469fdb40104944",
+    "curriculum.py": "e3cc2a59c8d5cf704f5efc2cf29c69b6cc07b872d98a5faae861efd81746eac0",
+    "env.py": "c1856bcbdcdc78216733e5c5e1f4d8eaf99c4141d03df9b20a3200d84d518abb",
+    "evaluate.py": "cc7b0ad5521e9ad7fbced2a119d3afd758ce4b42592e4b1fb6746901f9194cdb",
+    "make_gifs.py": "b7243304984d9fc29150a5a82f6266c019ca6e532f730b839b5774f858bec590",
+    "mappo.py": "fb1640ce99a43bf43ad5480a1a1ba975e18885190c6dae6fe6656255eb61f77f",
+    "model.py": "e6a4c6bd55c8da67e5cf4ae5842e3c1af2424dec998e8152447c30dc6f4a9e94",
+    "mpc.py": "20534d185ea72cd978ddca3c77d350caa6e6928bebe5cf4a1b463e3c4b171814",
+    "mpc_exercise.py": "1d5843408c247af276a37106d77c65971c5cd1675fcb39915c37e181074b0118",
+    "plants.py": "b18d70356ddfc2502af796532231414bd98a1f2c6ab9baacd2f805cf05bb667a",
+    "preview_scenarios.py": "8a40538b0e92644287c23657d50e4764c49dbb9b4f420c8588e6389f9d847ba9",
+    "reference.py": "ee5046e00d4c96f2ce01a866dd1e0599f1913564c3eeb4b3b1c1fea35aeab3e9",
+    "scenarios.py": "d994eb5261e114d370caf4bc84fad94ec4437ffbea78cdc8364ee50a2ab4b702",
+    "train.py": "1829aac605322b265ce3fb9948e9415be4885e0b092225ac858ad83fa15178a7",
+    "transfer.py": "e4de89a772176e22e9863d545f755ea88f778766b7c6da91ba9c78006d94b89d",
+    "view.py": "fb2c46380e77714d1efa5d6bef34052384581cff2ff0733857e761034a359b08",
+    "view_mujoco.py": "6b03a21c37212a0e3c20918b6bd01b17d421e591b39c5535c1f51915d91479ae",
+    "walkthrough.py": "d9cca90493594e38c7c0db282e6f53be911d6a5ff0bd03de94f55eff82a241f1"
+  },
+  "checkpoint_env_config": {
+    "controller": "mpc",
+    "n_cars": 3,
+    "max_neighbors": 4,
+    "sensing_radius": 5.0,
+    "policy_dt": 0.2,
+    "control_dt": 0.05,
+    "physics_dt": 0.01,
+    "reference_horizon": 1.2,
+    "mpc_horizon": 0.8,
+    "wheelbase": 0.35,
+    "max_speed": 2.0,
+    "max_accel": 1.5,
+    "max_brake": 2.0,
+    "max_steer": 0.47123889803846897,
+    "max_steer_rate": 1.5707963267948966,
+    "footprint_radius": 0.5,
+    "collision_margin": 0.08,
+    "goal_tolerance": 0.25,
+    "stop_speed": 0.08,
+    "dwell_time": 0.2,
+    "deadline_window": 0.6,
+    "synchrony_window": 0.6,
+    "timeout_margin": 3.0,
+    "waypoint_forward_min": 0.25,
+    "waypoint_forward_max": 2.0,
+    "waypoint_lateral_max": 1.2,
+    "waypoint_capture": 0.3,
+    "pursuit_speed_gain": 4.0,
+    "family": "mixed",
+    "family_weights": null,
+    "arena_half_min": 4.0,
+    "arena_half_max": 7.0,
+    "min_trip": 1.0,
+    "heading_jitter": 1.0471975511965976,
+    "initial_speed_max": 0.4,
+    "deadline_slack_min": 1.5,
+    "deadline_slack_max": 2.2,
+    "schedule_weight": 0.5,
+    "mpc_maxiter": 45
+  },
+  "runtime_default_fields_absent_from_checkpoint": {
+    "collision_model": "discs",
+    "footprint_discs": 2,
+    "car_length": 0.537,
+    "car_width": 0.245,
+    "rear_axle_to_centre": 0.164,
+    "constraint_stride": 2,
+    "unequal_short_max": 2.0
+  },
+  "selection": "Six fixed seeds chosen before rollout; no outcome screening.",
+  "pairing": "Same initial poses, zero initial speeds, goals and deadline; independent closed-loop rollouts.",
+  "sampling": "Recorded at each policy step (0.20 s), plus terminal state.",
+  "purpose": "Illustrative episodes, not a statistical benchmark or safety certificate.",
+  "versions": {
+    "torch": "2.11.0",
+    "numpy": "2.2.5"
+  },
+  "scenarios": [
+    {
+      "stem": "01_random",
+      "title": "Random starts and goals",
+      "seed": 7710001,
+      "config": {
+        "controller": "mpc",
+        "n_cars": 3,
+        "max_neighbors": 4,
+        "sensing_radius": 5.0,
+        "policy_dt": 0.2,
+        "control_dt": 0.05,
+        "physics_dt": 0.01,
+        "reference_horizon": 1.2,
+        "mpc_horizon": 0.8,
+        "wheelbase": 0.35,
+        "max_speed": 2.0,
+        "max_accel": 1.5,
+        "max_brake": 2.0,
+        "max_steer": 0.47123889803846897,
+        "max_steer_rate": 1.5707963267948966,
+        "collision_model": "discs",
+        "footprint_discs": 2,
+        "car_length": 0.537,
+        "car_width": 0.245,
+        "rear_axle_to_centre": 0.164,
+        "footprint_radius": 0.5,
+        "constraint_stride": 2,
+        "collision_margin": 0.08,
+        "goal_tolerance": 0.25,
+        "stop_speed": 0.08,
+        "dwell_time": 0.2,
+        "deadline_window": 0.6,
+        "synchrony_window": 0.6,
+        "timeout_margin": 3.0,
+        "waypoint_forward_min": 0.25,
+        "waypoint_forward_max": 2.0,
+        "waypoint_lateral_max": 1.2,
+        "waypoint_capture": 0.3,
+        "pursuit_speed_gain": 4.0,
+        "family": "random",
+        "family_weights": null,
+        "arena_half_min": 4.0,
+        "arena_half_max": 7.0,
+        "min_trip": 1.0,
+        "unequal_short_max": 2.0,
+        "heading_jitter": 1.0471975511965976,
+        "initial_speed_max": 0.0,
+        "deadline_slack_min": 1.5,
+        "deadline_slack_max": 2.2,
+        "schedule_weight": 0.5,
+        "mpc_maxiter": 45
+      },
+      "runs": {
+        "kinematic": {
+          "trace": "data/01_random_kinematic.npz",
+          "info": {
+            "time": 11.989999999999789,
+            "deadline": 11.746910916087966,
+            "family": "random",
+            "arena_half": 4.9043201176489735,
+            "arrival_times": [
+              11.769999999999794,
+              11.699999999999795,
+              11.789999999999793
+            ],
+            "arrived": [
+              true,
+              true,
+              true
+            ],
+            "final_goal_distances": [
+              0.05150652446062491,
+              0.030739830087535523,
+              0.06131319858998288
+            ],
+            "initial_distances": [
+              4.57411255492528,
+              7.154750499949579,
+              3.8257498146281095
+            ],
+            "early_arrival_count": 0,
+            "late_arrival_count": 0,
+            "on_time_arrival_count": 3,
+            "all_arrived": true,
+            "arrival_fraction": 1.0,
+            "arrival_spread": 0.08999999999999808,
+            "max_deadline_error": 0.046910916088171106,
+            "success": true,
+            "collision": false,
+            "timeout": false,
+            "min_separation": 0.08270117807478083,
+            "fallback_rate": 0.005571030640668524,
+            "mpc_solve_count": 718,
+            "mpc_solve_mean_seconds": 0.0026480355528421626,
+            "mpc_solve_max_seconds": 0.08785816599265672,
+            "episode_reward": 14.621640165326582,
+            "reward_terms": {
+              "progress": 0.005077847309540806,
+              "schedule": -0.005263886014314267,
+              "elapsed": -0.0018999999999999594,
+              "arrival": 4.989387823585302,
+              "completion": 7.959771017900391,
+              "collision": 0.0,
+              "timeout": 0.0
+            }
+          }
+        },
+        "mujoco": {
+          "trace": "data/01_random_mujoco.npz",
+          "info": {
+            "time": 11.999999999999789,
+            "deadline": 11.746910916087966,
+            "family": "random",
+            "arena_half": 4.9043201176489735,
+            "arrival_times": [
+              11.769999999999794,
+              11.719999999999795,
+              11.799999999999793
+            ],
+            "arrived": [
+              true,
+              true,
+              true
+            ],
+            "final_goal_distances": [
+              0.04912498469269404,
+              0.027395279639779935,
+              0.06340585724432074
+            ],
+            "initial_distances": [
+              4.57411255492528,
+              7.154750499949579,
+              3.8257498146281095
+            ],
+            "early_arrival_count": 0,
+            "late_arrival_count": 0,
+            "on_time_arrival_count": 3,
+            "all_arrived": true,
+            "arrival_fraction": 1.0,
+            "arrival_spread": 0.0799999999999983,
+            "max_deadline_error": 0.05308908391182676,
+            "success": true,
+            "collision": false,
+            "timeout": false,
+            "min_separation": 0.0903573100350763,
+            "fallback_rate": 0.004172461752433936,
+            "mpc_solve_count": 719,
+            "mpc_solve_mean_seconds": 0.003115476492314887,
+            "mpc_solve_max_seconds": 0.07632824999745935,
+            "episode_reward": 14.687276168800429,
+            "reward_terms": {
+              "progress": 0.005398602133229865,
+              "schedule": -0.005190365718924117,
+              "elapsed": -0.0019999999999999575,
+              "arrival": 4.990579436604381,
+              "completion": 8.010634353524045,
+              "collision": 0.0,
+              "timeout": 0.0
+            }
+          }
+        }
+      },
+      "scenario_metadata": {
+        "draw_index": 0,
+        "sampling_attempts": 1,
+        "trip_lengths": [
+          4.57411255492528,
+          7.154750499949579,
+          3.8257498146281095
+        ],
+        "heading_errors": [
+          0.7423189515903308,
+          -0.2723403436042657,
+          -0.18913346172988502
+        ],
+        "initial_speeds": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "car_permutation": [
+          1,
+          0,
+          2
+        ],
+        "deadline_slack": 1.642798709434325,
+        "nominal_trip_times": [
+          4.883904171136663,
+          7.028804472377499,
+          4.044023718593152
+        ],
+        "deadline_rule": "quintic_speed_acceleration_plus_turning_heuristic",
+        "deadline_is_feasibility_certificate": false,
+        "arena_is_sampling_region_only": true,
+        "minimum_start_separation": 1.467805442755464,
+        "minimum_goal_separation": 3.8303313404128643
+      }
+    },
+    {
+      "stem": "02_crossing",
+      "title": "Three-way crossing",
+      "seed": 7710002,
+      "config": {
+        "controller": "mpc",
+        "n_cars": 3,
+        "max_neighbors": 4,
+        "sensing_radius": 5.0,
+        "policy_dt": 0.2,
+        "control_dt": 0.05,
+        "physics_dt": 0.01,
+        "reference_horizon": 1.2,
+        "mpc_horizon": 0.8,
+        "wheelbase": 0.35,
+        "max_speed": 2.0,
+        "max_accel": 1.5,
+        "max_brake": 2.0,
+        "max_steer": 0.47123889803846897,
+        "max_steer_rate": 1.5707963267948966,
+        "collision_model": "discs",
+        "footprint_discs": 2,
+        "car_length": 0.537,
+        "car_width": 0.245,
+        "rear_axle_to_centre": 0.164,
+        "footprint_radius": 0.5,
+        "constraint_stride": 2,
+        "collision_margin": 0.08,
+        "goal_tolerance": 0.25,
+        "stop_speed": 0.08,
+        "dwell_time": 0.2,
+        "deadline_window": 0.6,
+        "synchrony_window": 0.6,
+        "timeout_margin": 3.0,
+        "waypoint_forward_min": 0.25,
+        "waypoint_forward_max": 2.0,
+        "waypoint_lateral_max": 1.2,
+        "waypoint_capture": 0.3,
+        "pursuit_speed_gain": 4.0,
+        "family": "crossing",
+        "family_weights": null,
+        "arena_half_min": 4.0,
+        "arena_half_max": 7.0,
+        "min_trip": 1.0,
+        "unequal_short_max": 2.0,
+        "heading_jitter": 1.0471975511965976,
+        "initial_speed_max": 0.0,
+        "deadline_slack_min": 1.5,
+        "deadline_slack_max": 2.2,
+        "schedule_weight": 0.5,
+        "mpc_maxiter": 45
+      },
+      "runs": {
+        "kinematic": {
+          "trace": "data/02_crossing_kinematic.npz",
+          "info": {
+            "time": 15.079999999999723,
+            "deadline": 14.82081647659961,
+            "family": "crossing",
+            "arena_half": 6.68920523698696,
+            "arrival_times": [
+              14.869999999999727,
+              14.879999999999727,
+              14.819999999999729
+            ],
+            "arrived": [
+              true,
+              true,
+              true
+            ],
+            "final_goal_distances": [
+              0.03236479989100224,
+              0.030651960663634573,
+              0.031167023428453882
+            ],
+            "initial_distances": [
+              8.402802947346121,
+              8.278423400212578,
+              8.928919679192264
+            ],
+            "early_arrival_count": 0,
+            "late_arrival_count": 0,
+            "on_time_arrival_count": 3,
+            "all_arrived": true,
+            "arrival_fraction": 1.0,
+            "arrival_spread": 0.05999999999999872,
+            "max_deadline_error": 0.05918352340011701,
+            "success": true,
+            "collision": false,
+            "timeout": false,
+            "min_separation": 2.199237348629385,
+            "fallback_rate": 0.0,
+            "mpc_solve_count": 905,
+            "mpc_solve_mean_seconds": 0.0009098154726954054,
+            "mpc_solve_max_seconds": 0.006144166996818967,
+            "episode_reward": 14.497395769158281,
+            "reward_terms": {
+              "progress": 0.000852383163428242,
+              "schedule": -0.0018408117069844872,
+              "elapsed": -0.000799999999999983,
+              "arrival": 4.9863198848947885,
+              "completion": 8.198456356380317,
+              "collision": 0.0,
+              "timeout": 0.0
+            }
+          }
+        },
+        "mujoco": {
+          "trace": "data/02_crossing_mujoco.npz",
+          "info": {
+            "time": 15.099999999999723,
+            "deadline": 14.82081647659961,
+            "family": "crossing",
+            "arena_half": 6.68920523698696,
+            "arrival_times": [
+              14.889999999999727,
+              14.899999999999727,
+              14.849999999999728
+            ],
+            "arrived": [
+              true,
+              true,
+              true
+            ],
+            "final_goal_distances": [
+              0.027003040328635104,
+              0.02876412062417197,
+              0.027161898116722424
+            ],
+            "initial_distances": [
+              8.402802947346121,
+              8.278423400212578,
+              8.928919679192264
+            ],
+            "early_arrival_count": 0,
+            "late_arrival_count": 0,
+            "on_time_arrival_count": 3,
+            "all_arrived": true,
+            "arrival_fraction": 1.0,
+            "arrival_spread": 0.049999999999998934,
+            "max_deadline_error": 0.07918352340011658,
+            "success": true,
+            "collision": false,
+            "timeout": false,
+            "min_separation": 2.116834125687742,
+            "fallback_rate": 0.0,
+            "mpc_solve_count": 905,
+            "mpc_solve_mean_seconds": 0.001191066813144514,
+            "mpc_solve_max_seconds": 0.006945083994651213,
+            "episode_reward": 14.293528426341059,
+            "reward_terms": {
+              "progress": 0.0012359327258436217,
+              "schedule": -0.0016216964145364294,
+              "elapsed": -0.0009999999999999788,
+              "arrival": 4.972535951407003,
+              "completion": 8.062947791902435,
+              "collision": 0.0,
+              "timeout": 0.0
+            }
+          }
+        }
+      },
+      "scenario_metadata": {
+        "draw_index": 0,
+        "sampling_attempts": 1,
+        "trip_lengths": [
+          8.402802947346121,
+          8.278423400212578,
+          8.928919679192264
+        ],
+        "heading_errors": [
+          0.41577198033944435,
+          -0.5567599453816726,
+          0.5894985650037466
+        ],
+        "initial_speeds": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "car_permutation": [
+          1,
+          0,
+          2
+        ],
+        "deadline_slack": 1.6348503303248973,
+        "nominal_trip_times": [
+          8.320779778177835,
+          8.298688397700968,
+          8.943214070057401
+        ],
+        "deadline_rule": "quintic_speed_acceleration_plus_turning_heuristic",
+        "deadline_is_feasibility_certificate": false,
+        "arena_is_sampling_region_only": true,
+        "minimum_start_separation": 7.497302211928914,
+        "minimum_goal_separation": 6.65758590000521,
+        "hub": [
+          -0.5049359542871084,
+          -1.9197241061503516
+        ],
+        "orientation": 1.2916070985988042
+      }
+    },
+    {
+      "stem": "03_converging",
+      "title": "Converging routes",
+      "seed": 7710003,
+      "config": {
+        "controller": "mpc",
+        "n_cars": 3,
+        "max_neighbors": 4,
+        "sensing_radius": 5.0,
+        "policy_dt": 0.2,
+        "control_dt": 0.05,
+        "physics_dt": 0.01,
+        "reference_horizon": 1.2,
+        "mpc_horizon": 0.8,
+        "wheelbase": 0.35,
+        "max_speed": 2.0,
+        "max_accel": 1.5,
+        "max_brake": 2.0,
+        "max_steer": 0.47123889803846897,
+        "max_steer_rate": 1.5707963267948966,
+        "collision_model": "discs",
+        "footprint_discs": 2,
+        "car_length": 0.537,
+        "car_width": 0.245,
+        "rear_axle_to_centre": 0.164,
+        "footprint_radius": 0.5,
+        "constraint_stride": 2,
+        "collision_margin": 0.08,
+        "goal_tolerance": 0.25,
+        "stop_speed": 0.08,
+        "dwell_time": 0.2,
+        "deadline_window": 0.6,
+        "synchrony_window": 0.6,
+        "timeout_margin": 3.0,
+        "waypoint_forward_min": 0.25,
+        "waypoint_forward_max": 2.0,
+        "waypoint_lateral_max": 1.2,
+        "waypoint_capture": 0.3,
+        "pursuit_speed_gain": 4.0,
+        "family": "converging",
+        "family_weights": null,
+        "arena_half_min": 4.0,
+        "arena_half_max": 7.0,
+        "min_trip": 1.0,
+        "unequal_short_max": 2.0,
+        "heading_jitter": 1.0471975511965976,
+        "initial_speed_max": 0.0,
+        "deadline_slack_min": 1.5,
+        "deadline_slack_max": 2.2,
+        "schedule_weight": 0.5,
+        "mpc_maxiter": 45
+      },
+      "runs": {
+        "kinematic": {
+          "trace": "data/03_converging_kinematic.npz",
+          "info": {
+            "time": 8.949999999999854,
+            "deadline": 8.795776757427173,
+            "family": "converging",
+            "arena_half": 4.100196179536795,
+            "arrival_times": [
+              8.749999999999858,
+              8.67999999999986,
+              8.67999999999986
+            ],
+            "arrived": [
+              true,
+              true,
+              true
+            ],
+            "final_goal_distances": [
+              0.048449246089440796,
+              0.04275611600071646,
+              0.050453361166930596
+            ],
+            "initial_distances": [
+              3.9116234208450997,
+              4.181243899324344,
+              3.649450092946557
+            ],
+            "early_arrival_count": 0,
+            "late_arrival_count": 0,
+            "on_time_arrival_count": 3,
+            "all_arrived": true,
+            "arrival_fraction": 1.0,
+            "arrival_spread": 0.06999999999999851,
+            "max_deadline_error": 0.11577675742731408,
+            "success": true,
+            "collision": false,
+            "timeout": false,
+            "min_separation": 0.38377136017831603,
+            "fallback_rate": 0.0,
+            "mpc_solve_count": 535,
+            "mpc_solve_mean_seconds": 0.001431157478108506,
+            "mpc_solve_max_seconds": 0.006722167003317736,
+            "episode_reward": 14.413158418393186,
+            "reward_terms": {
+              "progress": 0.0036135947953297087,
+              "schedule": -0.006072763888530952,
+              "elapsed": -0.0014999999999999682,
+              "arrival": 4.9336736708006645,
+              "completion": 7.337199013076714,
+              "collision": 0.0,
+              "timeout": 0.0
+            }
+          }
+        },
+        "mujoco": {
+          "trace": "data/03_converging_mujoco.npz",
+          "info": {
+            "time": 8.949999999999854,
+            "deadline": 8.795776757427173,
+            "family": "converging",
+            "arena_half": 4.100196179536795,
+            "arrival_times": [
+              8.749999999999858,
+              8.699999999999859,
+              8.699999999999859
+            ],
+            "arrived": [
+              true,
+              true,
+              true
+            ],
+            "final_goal_distances": [
+              0.04208877509436901,
+              0.03866506180674652,
+              0.04917713171564217
+            ],
+            "initial_distances": [
+              3.9116234208450997,
+              4.181243899324344,
+              3.649450092946557
+            ],
+            "early_arrival_count": 0,
+            "late_arrival_count": 0,
+            "on_time_arrival_count": 3,
+            "all_arrived": true,
+            "arrival_fraction": 1.0,
+            "arrival_spread": 0.049999999999998934,
+            "max_deadline_error": 0.09577675742731451,
+            "success": true,
+            "collision": false,
+            "timeout": false,
+            "min_separation": 0.3980198261978405,
+            "fallback_rate": 0.0,
+            "mpc_solve_count": 535,
+            "mpc_solve_mean_seconds": 0.0017843983513107261,
+            "mpc_solve_max_seconds": 0.015023708998342045,
+            "episode_reward": 14.94202115492901,
+            "reward_terms": {
+              "progress": 0.004125427831121291,
+              "schedule": -0.005580400835037931,
+              "elapsed": -0.0014999999999999682,
+              "arrival": 4.952957261576844,
+              "completion": 7.843018951727789,
+              "collision": 0.0,
+              "timeout": 0.0
+            }
+          }
+        }
+      },
+      "scenario_metadata": {
+        "draw_index": 0,
+        "sampling_attempts": 1,
+        "trip_lengths": [
+          3.9116234208450997,
+          4.181243899324344,
+          3.649450092946557
+        ],
+        "heading_errors": [
+          -0.8478237343621262,
+          -0.8894897400186091,
+          0.1773052653033242
+        ],
+        "initial_speeds": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "car_permutation": [
+          2,
+          1,
+          0
+        ],
+        "deadline_slack": 1.8277526625272738,
+        "nominal_trip_times": [
+          4.540171724241124,
+          4.70292120682325,
+          3.9446494450242944
+        ],
+        "deadline_rule": "quintic_speed_acceleration_plus_turning_heuristic",
+        "deadline_is_feasibility_certificate": false,
+        "arena_is_sampling_region_only": true,
+        "minimum_start_separation": 4.554265495088992,
+        "minimum_goal_separation": 1.9543964908958278,
+        "hub": [
+          0.649496189370344,
+          0.5663666790659241
+        ],
+        "orientation": -0.10951689483658214
+      }
+    },
+    {
+      "stem": "04_parallel",
+      "title": "Parallel journeys",
+      "seed": 7710004,
+      "config": {
+        "controller": "mpc",
+        "n_cars": 3,
+        "max_neighbors": 4,
+        "sensing_radius": 5.0,
+        "policy_dt": 0.2,
+        "control_dt": 0.05,
+        "physics_dt": 0.01,
+        "reference_horizon": 1.2,
+        "mpc_horizon": 0.8,
+        "wheelbase": 0.35,
+        "max_speed": 2.0,
+        "max_accel": 1.5,
+        "max_brake": 2.0,
+        "max_steer": 0.47123889803846897,
+        "max_steer_rate": 1.5707963267948966,
+        "collision_model": "discs",
+        "footprint_discs": 2,
+        "car_length": 0.537,
+        "car_width": 0.245,
+        "rear_axle_to_centre": 0.164,
+        "footprint_radius": 0.5,
+        "constraint_stride": 2,
+        "collision_margin": 0.08,
+        "goal_tolerance": 0.25,
+        "stop_speed": 0.08,
+        "dwell_time": 0.2,
+        "deadline_window": 0.6,
+        "synchrony_window": 0.6,
+        "timeout_margin": 3.0,
+        "waypoint_forward_min": 0.25,
+        "waypoint_forward_max": 2.0,
+        "waypoint_lateral_max": 1.2,
+        "waypoint_capture": 0.3,
+        "pursuit_speed_gain": 4.0,
+        "family": "parallel",
+        "family_weights": null,
+        "arena_half_min": 4.0,
+        "arena_half_max": 7.0,
+        "min_trip": 1.0,
+        "unequal_short_max": 2.0,
+        "heading_jitter": 1.0471975511965976,
+        "initial_speed_max": 0.0,
+        "deadline_slack_min": 1.5,
+        "deadline_slack_max": 2.2,
+        "schedule_weight": 0.5,
+        "mpc_maxiter": 45
+      },
+      "runs": {
+        "kinematic": {
+          "trace": "data/04_parallel_kinematic.npz",
+          "info": {
+            "time": 11.01999999999981,
+            "deadline": 10.793908831331631,
+            "family": "parallel",
+            "arena_half": 6.255647725184913,
+            "arrival_times": [
+              10.709999999999816,
+              10.739999999999815,
+              10.819999999999814
+            ],
+            "arrived": [
+              true,
+              true,
+              true
+            ],
+            "final_goal_distances": [
+              0.04596429696288014,
+              0.047702609842116515,
+              0.04365482542157141
+            ],
+            "initial_distances": [
+              4.9555970450828335,
+              4.9555970450828335,
+              4.9555970450828335
+            ],
+            "early_arrival_count": 0,
+            "late_arrival_count": 0,
+            "on_time_arrival_count": 3,
+            "all_arrived": true,
+            "arrival_fraction": 1.0,
+            "arrival_spread": 0.10999999999999766,
+            "max_deadline_error": 0.08390883133181504,
+            "success": true,
+            "collision": false,
+            "timeout": false,
+            "min_separation": 1.1557152579165528,
+            "fallback_rate": 0.0,
+            "mpc_solve_count": 659,
+            "mpc_solve_mean_seconds": 0.0013979169911876666,
+            "mpc_solve_max_seconds": 0.1659968750027474,
+            "episode_reward": 13.959453035740038,
+            "reward_terms": {
+              "progress": 0.00014436251215238163,
+              "schedule": -0.004618405242170387,
+              "elapsed": -0.00019999999999999575,
+              "arrival": 1.6650916033219791,
+              "completion": 7.2384254787887805,
+              "collision": 0.0,
+              "timeout": 0.0
+            }
+          }
+        },
+        "mujoco": {
+          "trace": "data/04_parallel_mujoco.npz",
+          "info": {
+            "time": 11.049999999999809,
+            "deadline": 10.793908831331631,
+            "family": "parallel",
+            "arena_half": 6.255647725184913,
+            "arrival_times": [
+              10.719999999999816,
+              10.739999999999815,
+              10.849999999999813
+            ],
+            "arrived": [
+              true,
+              true,
+              true
+            ],
+            "final_goal_distances": [
+              0.04722735730556991,
+              0.04608757342576864,
+              0.040649444292184735
+            ],
+            "initial_distances": [
+              4.9555970450828335,
+              4.9555970450828335,
+              4.9555970450828335
+            ],
+            "early_arrival_count": 0,
+            "late_arrival_count": 0,
+            "on_time_arrival_count": 3,
+            "all_arrived": true,
+            "arrival_fraction": 1.0,
+            "arrival_spread": 0.12999999999999723,
+            "max_deadline_error": 0.07390883133181525,
+            "success": true,
+            "collision": false,
+            "timeout": false,
+            "min_separation": 1.1454376276074376,
+            "fallback_rate": 0.0,
+            "mpc_solve_count": 659,
+            "mpc_solve_mean_seconds": 0.0013262665569015576,
+            "mpc_solve_max_seconds": 0.006843916999059729,
+            "episode_reward": 13.83788551493646,
+            "reward_terms": {
+              "progress": 0.00037596450002543296,
+              "schedule": -0.004505490586529455,
+              "elapsed": -0.0004999999999999894,
+              "arrival": 1.659399640948185,
+              "completion": 7.118784829003841,
+              "collision": 0.0,
+              "timeout": 0.0
+            }
+          }
+        }
+      },
+      "scenario_metadata": {
+        "draw_index": 0,
+        "sampling_attempts": 1,
+        "trip_lengths": [
+          4.9555970450828335,
+          4.9555970450828335,
+          4.9555970450828335
+        ],
+        "heading_errors": [
+          0.3653899193378837,
+          0.5415435824078186,
+          -1.0359489047330568
+        ],
+        "initial_speeds": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "car_permutation": [
+          1,
+          2,
+          0
+        ],
+        "deadline_slack": 1.9436948443008562,
+        "nominal_trip_times": [
+          4.989781007364833,
+          5.110783367768327,
+          5.450397145618938
+        ],
+        "deadline_rule": "quintic_speed_acceleration_plus_turning_heuristic",
+        "deadline_is_feasibility_certificate": false,
+        "arena_is_sampling_region_only": true,
+        "minimum_start_separation": 1.801038316926839,
+        "minimum_goal_separation": 1.801038316926839,
+        "displacement": [
+          -4.901657423199364,
+          0.7291752730505077
+        ],
+        "orientation": 2.9939146989147027
+      }
+    },
+    {
+      "stem": "05_crossing_five",
+      "title": "Five-way crossing",
+      "seed": 7710005,
+      "config": {
+        "controller": "mpc",
+        "n_cars": 5,
+        "max_neighbors": 4,
+        "sensing_radius": 5.0,
+        "policy_dt": 0.2,
+        "control_dt": 0.05,
+        "physics_dt": 0.01,
+        "reference_horizon": 1.2,
+        "mpc_horizon": 0.8,
+        "wheelbase": 0.35,
+        "max_speed": 2.0,
+        "max_accel": 1.5,
+        "max_brake": 2.0,
+        "max_steer": 0.47123889803846897,
+        "max_steer_rate": 1.5707963267948966,
+        "collision_model": "discs",
+        "footprint_discs": 2,
+        "car_length": 0.537,
+        "car_width": 0.245,
+        "rear_axle_to_centre": 0.164,
+        "footprint_radius": 0.5,
+        "constraint_stride": 2,
+        "collision_margin": 0.08,
+        "goal_tolerance": 0.25,
+        "stop_speed": 0.08,
+        "dwell_time": 0.2,
+        "deadline_window": 0.6,
+        "synchrony_window": 0.6,
+        "timeout_margin": 3.0,
+        "waypoint_forward_min": 0.25,
+        "waypoint_forward_max": 2.0,
+        "waypoint_lateral_max": 1.2,
+        "waypoint_capture": 0.3,
+        "pursuit_speed_gain": 4.0,
+        "family": "crossing",
+        "family_weights": null,
+        "arena_half_min": 4.0,
+        "arena_half_max": 7.0,
+        "min_trip": 1.0,
+        "unequal_short_max": 2.0,
+        "heading_jitter": 1.0471975511965976,
+        "initial_speed_max": 0.0,
+        "deadline_slack_min": 1.5,
+        "deadline_slack_max": 2.2,
+        "schedule_weight": 0.5,
+        "mpc_maxiter": 45
+      },
+      "runs": {
+        "kinematic": {
+          "trace": "data/05_crossing_five_kinematic.npz",
+          "info": {
+            "time": 17.20999999999989,
+            "deadline": 16.824020494561545,
+            "family": "crossing",
+            "arena_half": 5.864843721920518,
+            "arrival_times": [
+              17.00999999999986,
+              17.00999999999986,
+              17.00999999999986,
+              16.989999999999856,
+              16.999999999999858
+            ],
+            "arrived": [
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "final_goal_distances": [
+              0.03545434252881667,
+              0.03396184340278614,
+              0.036360165771230524,
+              0.035864742622291126,
+              0.03864057746433812
+            ],
+            "initial_distances": [
+              7.884703677104766,
+              7.9458088157753375,
+              7.635608644883127,
+              8.118362157066782,
+              7.581478154248928
+            ],
+            "early_arrival_count": 0,
+            "late_arrival_count": 0,
+            "on_time_arrival_count": 5,
+            "all_arrived": true,
+            "arrival_fraction": 1.0,
+            "arrival_spread": 0.020000000000003126,
+            "max_deadline_error": 0.18597950543831487,
+            "success": true,
+            "collision": false,
+            "timeout": false,
+            "min_separation": 0.0793408222758451,
+            "fallback_rate": 0.0,
+            "mpc_solve_count": 1723,
+            "mpc_solve_mean_seconds": 0.0019516287798800323,
+            "mpc_solve_max_seconds": 0.018571416003396735,
+            "episode_reward": 12.39046823048114,
+            "reward_terms": {
+              "progress": 0.00010279807494958377,
+              "schedule": -0.0023047141275570394,
+              "elapsed": -0.00010000000000001563,
+              "arrival": 2.859288669508813,
+              "completion": 7.094259367851668,
+              "collision": 0.0,
+              "timeout": 0.0
+            }
+          }
+        },
+        "mujoco": {
+          "trace": "data/05_crossing_five_mujoco.npz",
+          "info": {
+            "time": 17.219999999999892,
+            "deadline": 16.824020494561545,
+            "family": "crossing",
+            "arena_half": 5.864843721920518,
+            "arrival_times": [
+              17.01999999999986,
+              17.00999999999986,
+              17.01999999999986,
+              16.999999999999858,
+              17.00999999999986
+            ],
+            "arrived": [
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "final_goal_distances": [
+              0.03183261847517264,
+              0.031689359532880754,
+              0.0345159798438643,
+              0.03272932261920871,
+              0.03651850420276628
+            ],
+            "initial_distances": [
+              7.884703677104766,
+              7.9458088157753375,
+              7.635608644883127,
+              8.118362157066782,
+              7.581478154248928
+            ],
+            "early_arrival_count": 0,
+            "late_arrival_count": 0,
+            "on_time_arrival_count": 5,
+            "all_arrived": true,
+            "arrival_fraction": 1.0,
+            "arrival_spread": 0.020000000000003126,
+            "max_deadline_error": 0.19597950543831644,
+            "success": true,
+            "collision": false,
+            "timeout": false,
+            "min_separation": 0.07754968057444611,
+            "fallback_rate": 0.000580046403712297,
+            "mpc_solve_count": 1724,
+            "mpc_solve_mean_seconds": 0.002700900696796714,
+            "mpc_solve_max_seconds": 0.027575999993132427,
+            "episode_reward": 12.289011936016603,
+            "reward_terms": {
+              "progress": 0.0002252884542420958,
+              "schedule": -0.002139416790557569,
+              "elapsed": -0.00020000000000003126,
+              "arrival": 3.8022993434406223,
+              "completion": 6.977001574288692,
+              "collision": 0.0,
+              "timeout": 0.0
+            }
+          }
+        }
+      },
+      "scenario_metadata": {
+        "draw_index": 0,
+        "sampling_attempts": 1,
+        "trip_lengths": [
+          7.884703677104766,
+          7.9458088157753375,
+          7.635608644883127,
+          8.118362157066782,
+          7.581478154248928
+        ],
+        "heading_errors": [
+          0.013037752162880464,
+          -0.10768671599024159,
+          -0.9266744622634283,
+          -0.39338741016310264,
+          -1.0303749306599823
+        ],
+        "initial_speeds": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "car_permutation": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "deadline_slack": 2.0693611669464995,
+        "nominal_trip_times": [
+          7.548703701508497,
+          7.672151158122196,
+          7.93809612885703,
+          8.033407005066959,
+          7.957567117233385
+        ],
+        "deadline_rule": "quintic_speed_acceleration_plus_turning_heuristic",
+        "deadline_is_feasibility_certificate": false,
+        "arena_is_sampling_region_only": true,
+        "minimum_start_separation": 4.29854719121827,
+        "minimum_goal_separation": 4.3027599773779555,
+        "hub": [
+          -1.4858734224802517,
+          -0.9767964495335022
+        ],
+        "orientation": 0.9116390786083954
+      }
+    },
+    {
+      "stem": "06_crossing_eight",
+      "title": "Eight-way crossing",
+      "seed": 7710006,
+      "config": {
+        "controller": "mpc",
+        "n_cars": 8,
+        "max_neighbors": 4,
+        "sensing_radius": 5.0,
+        "policy_dt": 0.2,
+        "control_dt": 0.05,
+        "physics_dt": 0.01,
+        "reference_horizon": 1.2,
+        "mpc_horizon": 0.8,
+        "wheelbase": 0.35,
+        "max_speed": 2.0,
+        "max_accel": 1.5,
+        "max_brake": 2.0,
+        "max_steer": 0.47123889803846897,
+        "max_steer_rate": 1.5707963267948966,
+        "collision_model": "discs",
+        "footprint_discs": 2,
+        "car_length": 0.537,
+        "car_width": 0.245,
+        "rear_axle_to_centre": 0.164,
+        "footprint_radius": 0.5,
+        "constraint_stride": 2,
+        "collision_margin": 0.08,
+        "goal_tolerance": 0.25,
+        "stop_speed": 0.08,
+        "dwell_time": 0.2,
+        "deadline_window": 0.6,
+        "synchrony_window": 0.6,
+        "timeout_margin": 3.0,
+        "waypoint_forward_min": 0.25,
+        "waypoint_forward_max": 2.0,
+        "waypoint_lateral_max": 1.2,
+        "waypoint_capture": 0.3,
+        "pursuit_speed_gain": 4.0,
+        "family": "crossing",
+        "family_weights": null,
+        "arena_half_min": 4.0,
+        "arena_half_max": 7.0,
+        "min_trip": 1.0,
+        "unequal_short_max": 2.0,
+        "heading_jitter": 1.0471975511965976,
+        "initial_speed_max": 0.0,
+        "deadline_slack_min": 1.5,
+        "deadline_slack_max": 2.2,
+        "schedule_weight": 0.5,
+        "mpc_maxiter": 45
+      },
+      "runs": {
+        "kinematic": {
+          "trace": "data/06_crossing_eight_kinematic.npz",
+          "info": {
+            "time": 24.100000000000968,
+            "deadline": 23.4926633597234,
+            "family": "crossing",
+            "arena_half": 5.887096602416211,
+            "arrival_times": [
+              23.880000000000933,
+              23.840000000000927,
+              23.880000000000933,
+              23.900000000000936,
+              23.86000000000093,
+              23.80000000000092,
+              23.870000000000932,
+              23.880000000000933
+            ],
+            "arrived": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "final_goal_distances": [
+              0.011864132849524598,
+              0.01861599586333814,
+              0.016304645203481228,
+              0.01193182808676435,
+              0.01858946606386524,
+              0.02051764606636786,
+              0.017794291172982646,
+              0.016481400980981255
+            ],
+            "initial_distances": [
+              10.10138219217749,
+              10.32927238668904,
+              9.48115086490783,
+              9.347088551457453,
+              9.763264994429594,
+              10.678359342798428,
+              9.506666934396499,
+              9.522611663312682
+            ],
+            "early_arrival_count": 0,
+            "late_arrival_count": 0,
+            "on_time_arrival_count": 8,
+            "all_arrived": true,
+            "arrival_fraction": 1.0,
+            "arrival_spread": 0.10000000000001563,
+            "max_deadline_error": 0.4073366402775349,
+            "success": true,
+            "collision": false,
+            "timeout": false,
+            "min_separation": 0.08133932061305765,
+            "fallback_rate": 0.0,
+            "mpc_solve_count": 3853,
+            "mpc_solve_mean_seconds": 0.002468414519002808,
+            "mpc_solve_max_seconds": 0.10870554200664628,
+            "episode_reward": 7.640424083171278,
+            "reward_terms": {
+              "progress": 0.0008707921626355396,
+              "schedule": -0.0008375600334966579,
+              "elapsed": -0.0010000000000001564,
+              "arrival": 3.5783039708657505,
+              "completion": 4.2931641529581475,
+              "collision": 0.0,
+              "timeout": 0.0
+            }
+          }
+        },
+        "mujoco": {
+          "trace": "data/06_crossing_eight_mujoco.npz",
+          "info": {
+            "time": 24.12000000000097,
+            "deadline": 23.4926633597234,
+            "family": "crossing",
+            "arena_half": 5.887096602416211,
+            "arrival_times": [
+              23.890000000000935,
+              23.85000000000093,
+              23.900000000000936,
+              23.92000000000094,
+              23.870000000000932,
+              23.820000000000924,
+              23.880000000000933,
+              23.890000000000935
+            ],
+            "arrived": [
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              true
+            ],
+            "final_goal_distances": [
+              0.00812505217161358,
+              0.014795454781801071,
+              0.011803208094204778,
+              0.008332330665444903,
+              0.01500070453223279,
+              0.016385086351195226,
+              0.014476988821142539,
+              0.012738262859201413
+            ],
+            "initial_distances": [
+              10.10138219217749,
+              10.32927238668904,
+              9.48115086490783,
+              9.347088551457453,
+              9.763264994429594,
+              10.678359342798428,
+              9.506666934396499,
+              9.522611663312682
+            ],
+            "early_arrival_count": 0,
+            "late_arrival_count": 0,
+            "on_time_arrival_count": 8,
+            "all_arrived": true,
+            "arrival_fraction": 1.0,
+            "arrival_spread": 0.10000000000001563,
+            "max_deadline_error": 0.42733664027753804,
+            "success": true,
+            "collision": false,
+            "timeout": false,
+            "min_separation": 0.08036421454611536,
+            "fallback_rate": 0.0,
+            "mpc_solve_count": 3855,
+            "mpc_solve_mean_seconds": 0.003419441057115596,
+            "mpc_solve_max_seconds": 0.19298208301188424,
+            "episode_reward": 7.491565072036428,
+            "reward_terms": {
+              "progress": 0.0010812160064057937,
+              "schedule": -0.000644028412987982,
+              "elapsed": -0.0012000000000001877,
+              "arrival": 4.067529722301791,
+              "completion": 4.152417490753291,
+              "collision": 0.0,
+              "timeout": 0.0
+            }
+          }
+        }
+      },
+      "scenario_metadata": {
+        "draw_index": 0,
+        "sampling_attempts": 1,
+        "trip_lengths": [
+          10.10138219217749,
+          10.32927238668904,
+          9.48115086490783,
+          9.347088551457453,
+          9.763264994429594,
+          10.678359342798428,
+          9.506666934396499,
+          9.522611663312682
+        ],
+        "heading_errors": [
+          0.10778794474515052,
+          0.3311421985838556,
+          -0.6214702361823248,
+          -0.33270036401011016,
+          -0.4240903467613776,
+          -0.9777352655120667,
+          -0.6601786844946498,
+          -0.6421669439170347
+        ],
+        "initial_speeds": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "car_permutation": [
+          4,
+          5,
+          7,
+          6,
+          3,
+          2,
+          0,
+          1
+        ],
+        "deadline_slack": 2.140318809962971,
+        "nominal_trip_times": [
+          9.733487734722999,
+          10.104832824986257,
+          9.493246919604683,
+          9.16668985768826,
+          9.627435610366321,
+          10.882800847844896,
+          9.544236023611573,
+          9.547110659689652
+        ],
+        "deadline_rule": "quintic_speed_acceleration_plus_turning_heuristic",
+        "deadline_is_feasibility_certificate": false,
+        "arena_is_sampling_region_only": true,
+        "minimum_start_separation": 3.4529726537334904,
+        "minimum_goal_separation": 3.5206938511606585,
+        "hub": [
+          0.4323444188487198,
+          0.09541302684483956
+        ],
+        "orientation": 1.4149990414442355
+      }
+    }
+  ]
+}

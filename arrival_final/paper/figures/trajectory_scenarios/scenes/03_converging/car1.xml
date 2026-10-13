@@ -1,0 +1,55 @@
+<mujoco>
+  <worldbody>
+    <body name="chassis_1" pos="3.8 0.3 0.052388" quat="0.609 0 0 -0.793">
+      <inertial pos="0 0 0" diaginertia=".05 .05 .08" mass="3.0"/>
+      <joint name="car_1_free" type="free"/>
+      <geom name="chassis_b_1" type="box" size=".10113 .1016 .02" pos="-.06 0 0"      rgba="0.8 0.2 0.2 1"/>
+      <geom name="chassis_f_1" type="box" size=".06 .07 .02"      pos=".10113 0 0"     rgba="0.8 0.2 0.2 1"/>
+      <geom name="front_1"     type="box" size=".052388 .02 .02"  pos=".2135 0 0"      rgba="0.8 0.2 0.2 1"/>
+      <geom name="back_1"      type="box" size=".052388 .02 .02"  pos="-.2135 0 0"     rgba="0.8 0.2 0.2 1"/>
+      <geom name="bumper_1"    type="box" size=".005 .09 .02"     pos=".265888 0 0.02" rgba="0.8 0.2 0.2 1"/>
+      <body name="lidar_1" pos=".12 0 .08" euler="0 0 -135">
+        <geom name="lidar_geom_1" type="cylinder" size=".01984 .02" mass="0" rgba="0.1 0.1 0.1 1"/>
+      </body>
+      <body name="car_1_wheel_fl">
+        <joint name="car_1_wfl_steer" type="hinge" pos="0.16113 .10016 0" limited="true" frictionloss="0.2" damping="0.2" armature="0.001" range="-30 30" axis="0 0 1"/>
+        <joint name="car_1_wfl" type="hinge" pos="0.16113 .122385 0" axis="0 1 0" frictionloss="0.1" damping="0.05" armature="0.01" limited="false"/>
+        <geom name="car_1_wfl" type="cylinder" size=".052388 .022225" pos="0.16113 .122385 0" mass="0.1" zaxis="0 1 0"/>
+      </body>
+      <body name="car_1_wheel_rl">
+        <joint name="car_1_wrl" type="hinge" pos="-0.16113 .122385 0" axis="0 1 0" frictionloss="0.1" damping="0.05" armature="0.01" limited="false"/>
+        <geom name="car_1_wrl" type="cylinder" size=".052388 .022225" pos="-0.16113 .122385 0" mass="0.1" zaxis="0 1 0"/>
+      </body>
+      <body name="car_1_wheel_fr">
+        <joint name="car_1_wfr_steer" type="hinge" pos="0.16113 -.10016 0" limited="true" frictionloss="0.2" damping="0.2" armature="0.001" range="-30 30" axis="0 0 1"/>
+        <joint name="car_1_wfr" type="hinge" pos="0.16113 -.122385 0" axis="0 1 0" frictionloss="0.1" damping="0.05" armature="0.01" limited="false"/>
+        <geom name="car_1_wfr" type="cylinder" size=".052388 .022225" pos="0.16113 -.122385 0" mass="0.1" zaxis="0 1 0"/>
+      </body>
+      <body name="car_1_wheel_rr">
+        <joint name="car_1_wrr" type="hinge" pos="-0.16113 -.122385 0" axis="0 1 0" frictionloss="0.1" damping="0.05" armature="0.01" limited="false"/>
+        <geom name="car_1_wrr" type="cylinder" size=".052388 .022225" pos="-0.16113 -.122385 0" mass="0.1" zaxis="0 1 0"/>
+      </body>
+    </body>
+  </worldbody>
+  <equality>
+    <joint joint1="car_1_wfl_steer" joint2="car_1_wfr_steer" polycoef="0 1 0 0 0"/>
+  </equality>
+  <tendon>
+    <fixed name="drive_1">
+      <joint joint="car_1_wfl" coef="1"/>
+      <joint joint="car_1_wrl" coef="1"/>
+      <joint joint="car_1_wfr" coef="1"/>
+      <joint joint="car_1_wrr" coef="1"/>
+    </fixed>
+  </tendon>
+  <contact>
+    <pair geom1="car_1_wfl" geom2="floor" condim="6" friction="2.5 2.5 .009 .0001 .0001"/>
+    <pair geom1="car_1_wfr" geom2="floor" condim="6" friction="2.5 2.5 .009 .0001 .0001"/>
+    <pair geom1="car_1_wrl" geom2="floor" condim="6" friction="2.5 2.5 .009 .0001 .0001"/>
+    <pair geom1="car_1_wrr" geom2="floor" condim="6" friction="2.5 2.5 .009 .0001 .0001"/>
+  </contact>
+  <actuator>
+    <motor name="drive_1" tendon="drive_1"/>
+    <position forcelimited="true" forcerange="-5 5" name="steer_1" joint="car_1_wfl_steer" kp="15"/>
+  </actuator>
+</mujoco>
